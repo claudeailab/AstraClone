@@ -19,7 +19,7 @@ export async function getPlatformInfo(): Promise<PlatformInfo> {
     name: name || "Platform",
     title: title || "",
     icon: icon || "solar:layers-bold",
-    primaryColor: primaryColor || "#0d9488",
+    primaryColor: primaryColor || "#73a3e2",
   };
 }
 
