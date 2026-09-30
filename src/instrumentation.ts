@@ -213,6 +213,77 @@ export async function register() {
     });
   }
 
+  // Schedule daily M365 client secret expiry reminders
+  {
+    const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+    async function checkM365Expiry() {
+      try {
+        const { getSetting, setSetting } = await import("./lib/encryption");
+        const [expiryDate, reminderEmail, reminderDaysStr] = await Promise.all([
+          getSetting("m365_expiryDate"),
+          getSetting("m365_reminderEmail"),
+          getSetting("m365_reminderDays"),
+        ]);
+        if (!expiryDate || !reminderEmail) return;
+
+        const daysRemaining = Math.ceil((new Date(expiryDate).getTime() - Date.now()) / MS_PER_DAY);
+        const reminderDays = parseInt(reminderDaysStr ?? "30", 10);
+        if (daysRemaining > reminderDays || daysRemaining < 0) return;
+
+        const today = new Date().toISOString().slice(0, 10);
+        const lastSent = await getSetting("m365_reminderLastSent");
+        if (lastSent === today) return;
+
+        const [smtpHost, smtpPort, smtpSsl, smtpUser, smtpPassword, fromName, fromEmail] = await Promise.all([
+          getSetting("smtp_host"),
+          getSetting("smtp_port"),
+          getSetting("smtp_ssl"),
+          getSetting("smtp_user"),
+          getSetting("smtp_password"),
+          getSetting("smtp_fromName"),
+          getSetting("smtp_fromEmail"),
+        ]);
+        if (!smtpHost || !fromEmail) return;
+
+        const nodemailer = await import("nodemailer");
+        const transporter = nodemailer.default.createTransport({
+          host: smtpHost,
+          port: Number(smtpPort ?? 587),
+          secure: smtpSsl === "true",
+          auth: smtpUser && smtpPassword ? { user: smtpUser, pass: smtpPassword } : undefined,
+        });
+
+        const { getPlatformInfo } = await import("./lib/platform");
+        const platform = await getPlatformInfo();
+        const dayLabel = `${daysRemaining} day${daysRemaining !== 1 ? "s" : ""}`;
+
+        await transporter.sendMail({
+          from: `${fromName ?? platform.name} <${fromEmail}>`,
+          to: reminderEmail,
+          subject: `Action required: M365 client secret expires in ${dayLabel}`,
+          text: [
+            `Your Microsoft 365 client secret for ${platform.name} expires on ${expiryDate} (${dayLabel} remaining).`,
+            "",
+            "Please renew the secret in the Azure Portal and update it under Admin → Microsoft 365.",
+            "",
+            `Platform: ${platform.name}`,
+            `Expiry date: ${expiryDate}`,
+            `Days remaining: ${daysRemaining}`,
+          ].join("\n"),
+        });
+
+        await setSetting("m365_reminderLastSent", today);
+        console.log(`[M365] Expiry reminder sent to ${reminderEmail} (${dayLabel} remaining)`);
+      } catch (err) {
+        console.error("[M365] Failed to send expiry reminder:", err);
+      }
+    }
+
+    setTimeout(checkM365Expiry, 60_000);
+    setInterval(checkM365Expiry, MS_PER_DAY);
+  }
+
   const results = await Promise.allSettled(
     checks.map(({ check }) => Promise.race([check(), new Promise<void>((_, rej) => setTimeout(() => rej(new Error("timeout")), 8000))]))
   );
