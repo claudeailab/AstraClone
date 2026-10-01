@@ -11,6 +11,9 @@
 - Absolute visual and behavioural consistency — enforced via `ui-conventions.ts`
 - Version shown in admin sidebar and user profile menu only — nowhere else
 - Version bumped with every push; commit message format: `v{version} - short description`
+- At the start of every session, verify `version.json` matches `package.json`; every version bump must update both files together in the same commit
+- Never push the same change twice — use `git push` only, never `mcp__github__push_files` for code changes
+- Each push must produce exactly 2 workflow runs: **Enforce Main Branch** and **Build and Push**. If more appear, find and fix the cause before continuing
 - Aggressively minimize GitHub Actions runtime: BuildKit cache, GHA layer cache, path filters, concurrency groups
 - **After every resolved issue**: update the webapp skill (`references/steps.md` and `references/conventions.md`) so the fix is captured for future sessions
 
