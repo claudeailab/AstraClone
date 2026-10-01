@@ -370,7 +370,7 @@ export default function UsersPage() {
                       </div>
                     </div>
                     {filteredAzure.map(u => (
-                      <label key={u.oid} className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-muted/50 cursor-pointer">
+                      <label key={u.oid} className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-muted/50 cursor-pointer w-full min-w-0">
                         <input
                           type="checkbox"
                           checked={azureSelected.has(u.oid)}
