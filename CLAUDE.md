@@ -2,6 +2,7 @@
 
 ## Rules (non-negotiable)
 
+- **Never assign tasks to the user.** When something is unclear or missing, investigate — read the code, trace the data, check the logs, look it up. The user is here to be helped, not to do the work. If a blocker is genuinely unresolvable without a decision only the user can make, ask a single precise question — never a list of tasks.
 - Always build after changes; run GitHub Actions after every push
 - Verify `main-only` ruleset at start of every session; recreate if missing
 - **Mobile-first always** — no hardcoded pixel dimensions anywhere
