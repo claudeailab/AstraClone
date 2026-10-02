@@ -16,18 +16,19 @@ interface StatCardProps {
   icon: React.ElementType;
   label: string;
   value: number | string;
-  gradient: string;
   delay?: string;
 }
 
-function StatCard({ icon: Icon, label, value, gradient, delay = "" }: StatCardProps) {
+function StatCard({ icon: Icon, label, value, delay = "" }: StatCardProps) {
   return (
-    <div className={`relative overflow-hidden rounded-2xl p-5 text-white animate-slide-up card-hover ${delay} bg-gradient-to-br ${gradient}`}>
-      <div className="absolute -right-3 -top-3 h-20 w-20 rounded-full bg-white/10" />
-      <div className="absolute -bottom-4 -left-4 h-14 w-14 rounded-full bg-black/10" />
-      <Icon className="relative h-6 w-6 mb-3 opacity-90" />
-      <p className="relative text-3xl font-bold tracking-tight">{value}</p>
-      <p className="relative text-sm mt-0.5 text-white/75 font-medium">{label}</p>
+    <div className={`relative overflow-hidden rounded-2xl p-5 bg-card border animate-slide-up card-hover ${delay}`}>
+      <div
+        className="absolute -right-3 -top-3 h-20 w-20 rounded-full"
+        style={{ background: "color-mix(in srgb, var(--color-primary) 8%, transparent)" }}
+      />
+      <Icon className="relative h-5 w-5 mb-3 text-primary" />
+      <p className="relative text-3xl font-bold tracking-tight text-foreground">{value}</p>
+      <p className="relative text-sm mt-0.5 text-muted-foreground font-medium">{label}</p>
     </div>
   );
 }
@@ -49,20 +50,29 @@ export default async function AdminDashboardPage() {
       <div className={pageInner}>
 
         {/* Hero banner */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-teal-500 via-cyan-600 to-sky-600 p-6 text-white mb-8">
-          <div className="absolute -top-6 -right-6 h-32 w-32 rounded-full bg-white/10" />
-          <div className="absolute bottom-0 left-24 h-20 w-20 rounded-full bg-white/[0.07]" />
-          <ShieldCheck className="relative h-8 w-8 mb-3 text-cyan-200" />
-          <h1 className="relative text-2xl font-bold tracking-tight">{greeting(user.displayName ?? user.email)}</h1>
-          <p className="relative text-white/70 text-sm mt-1">Admin Panel · Everything looks good.</p>
+        <div
+          className="relative overflow-hidden rounded-2xl p-6 mb-8 border"
+          style={{ background: "color-mix(in srgb, var(--color-primary) 10%, var(--color-card))" }}
+        >
+          <div
+            className="absolute -top-6 -right-6 h-32 w-32 rounded-full"
+            style={{ background: "color-mix(in srgb, var(--color-primary) 10%, transparent)" }}
+          />
+          <div
+            className="absolute bottom-0 left-24 h-20 w-20 rounded-full"
+            style={{ background: "color-mix(in srgb, var(--color-primary) 6%, transparent)" }}
+          />
+          <ShieldCheck className="relative h-8 w-8 mb-3 text-primary" />
+          <h1 className="relative text-2xl font-bold tracking-tight text-foreground">{greeting(user.displayName ?? user.email)}</h1>
+          <p className="relative text-sm mt-1 text-muted-foreground">Admin Panel · Everything looks good.</p>
         </div>
 
         {/* Stat cards */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-          <StatCard icon={Users} label="Total Users" value={totalUsers.count} gradient="from-teal-500 to-cyan-600" />
-          <StatCard icon={Cloud} label="Azure AD Users" value={azureUsers.count} gradient="from-sky-400 to-blue-500" delay="delay-75" />
-          <StatCard icon={CreditCard} label="Plans" value={totalPlans.count} gradient="from-emerald-500 to-teal-600" delay="delay-150" />
-          <StatCard icon={Activity} label="Audit Events" value={auditCount.count} gradient="from-cyan-400 to-sky-600" delay="delay-225" />
+          <StatCard icon={Users} label="Total Users" value={totalUsers.count} />
+          <StatCard icon={Cloud} label="Azure AD Users" value={azureUsers.count} delay="delay-75" />
+          <StatCard icon={CreditCard} label="Plans" value={totalPlans.count} delay="delay-150" />
+          <StatCard icon={Activity} label="Audit Events" value={auditCount.count} delay="delay-225" />
         </div>
 
         {/* Recent activity */}
