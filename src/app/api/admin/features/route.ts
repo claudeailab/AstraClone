@@ -7,7 +7,7 @@ import { logAudit } from "@/lib/audit";
 export async function GET() {
   await requireAdmin();
   const values = await Promise.all(FEATURE_KEYS.map(k => getSetting(`feature_${k}`)));
-  const features = Object.fromEntries(FEATURE_KEYS.map((k, i) => [k, values[i] !== "false"]));
+  const features = Object.fromEntries(FEATURE_KEYS.map((k, i) => [k, values[i] === "true"]));
   return NextResponse.json({ features });
 }
 
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   for (const k of FEATURE_KEYS) {
     if (typeof body[k] === "boolean") {
       const prev = await getSetting(`feature_${k}`);
-      const prevBool = prev !== "false";
+      const prevBool = prev === "true";
       if (prevBool !== body[k]) {
         await setSetting(`feature_${k}`, body[k] ? "true" : "false");
         changes.push(`${k}: ${prevBool}→${body[k]}`);
