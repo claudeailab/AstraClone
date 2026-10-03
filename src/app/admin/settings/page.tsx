@@ -28,6 +28,149 @@ const FEATURE_LIST: { key: FeatureKey; label: string; description: string }[] = 
   { key: "ai", label: "Artificial Intelligence", description: "Anthropic and OpenAI integrations" },
 ];
 
+const DATE_FORMAT_OPTIONS = [
+  { value: "DD/MM/YYYY",  label: "DD/MM/YYYY" },
+  { value: "MM/DD/YYYY",  label: "MM/DD/YYYY" },
+  { value: "YYYY-MM-DD",  label: "YYYY-MM-DD" },
+  { value: "DD MMM YYYY", label: "DD MMM YYYY" },
+  { value: "MMM DD, YYYY",label: "MMM DD, YYYY" },
+] as const;
+
+type DateFormatValue = typeof DATE_FORMAT_OPTIONS[number]["value"];
+
+function previewDate(fmt: string): string {
+  const n = new Date();
+  const y = n.getFullYear();
+  const m = String(n.getMonth() + 1).padStart(2, "0");
+  const d = String(n.getDate()).padStart(2, "0");
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return fmt.replace("YYYY", String(y)).replace("MMM", months[n.getMonth()]).replace("MM", m).replace("DD", d);
+}
+
+function previewTime(fmt: "12h" | "24h"): string {
+  const n = new Date();
+  const h = n.getHours();
+  const min = String(n.getMinutes()).padStart(2, "0");
+  if (fmt === "24h") return `${String(h).padStart(2, "0")}:${min}`;
+  const h12 = h % 12 || 12;
+  return `${h12}:${min} ${h >= 12 ? "PM" : "AM"}`;
+}
+
+function DateTimeTab() {
+  const [timezone, setTimezone] = useState("UTC");
+  const [dateFormat, setDateFormat] = useState<DateFormatValue>("DD/MM/YYYY");
+  const [timeFormat, setTimeFormat] = useState<"12h" | "24h">("24h");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [original, setOriginal] = useState({ timezone: "UTC", dateFormat: "DD/MM/YYYY" as DateFormatValue, timeFormat: "24h" as "12h" | "24h" });
+  const [timezones, setTimezones] = useState<string[]>([]);
+  const [tzFromEnv, setTzFromEnv] = useState(false);
+
+  useEffect(() => {
+    try { setTimezones(Intl.supportedValuesOf("timeZone")); } catch { /* unsupported */ }
+    fetch("/api/admin/settings/datetime").then(r => r.json()).then(d => {
+      const tz = d.timezone ?? "UTC";
+      const df = (d.dateFormat ?? "DD/MM/YYYY") as DateFormatValue;
+      const tf = (d.timeFormat ?? "24h") as "12h" | "24h";
+      setTimezone(tz); setDateFormat(df); setTimeFormat(tf);
+      setOriginal({ timezone: tz, dateFormat: df, timeFormat: tf });
+      setTzFromEnv(!!d.timezoneFromEnv);
+      setLoading(false);
+    });
+  }, []);
+
+  useEffect(() => {
+    setDirty(timezone !== original.timezone || dateFormat !== original.dateFormat || timeFormat !== original.timeFormat);
+  }, [timezone, dateFormat, timeFormat, original]);
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const r = await fetch("/api/admin/settings/datetime", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ timezone, dateFormat, timeFormat }),
+      });
+      if (!r.ok) { toast.error("Save failed"); return; }
+      toast.success("Date & time settings saved");
+      setOriginal({ timezone, dateFormat, timeFormat });
+      setDirty(false);
+    } finally { setSaving(false); }
+  }
+
+  if (loading) return <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
+
+  return (
+    <div className="space-y-8">
+      {/* Timezone */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Label>Timezone</Label>
+          {tzFromEnv && (
+            <span className="text-[10px] font-semibold bg-primary/10 text-primary px-1.5 py-0.5 rounded">ENV</span>
+          )}
+        </div>
+        <Input
+          list="tz-list"
+          value={timezone}
+          onChange={e => !tzFromEnv && setTimezone(e.target.value)}
+          disabled={tzFromEnv}
+          placeholder="e.g. Europe/Athens"
+          className="max-w-xs font-mono text-sm"
+        />
+        <datalist id="tz-list">
+          {timezones.map(tz => <option key={tz} value={tz} />)}
+        </datalist>
+        {tzFromEnv
+          ? <p className="text-xs text-muted-foreground">Set by the <code className="font-mono">TZ</code> environment variable — edit it in your compose file.</p>
+          : <p className="text-xs text-muted-foreground">IANA timezone (e.g. <code className="font-mono">Europe/Athens</code>, <code className="font-mono">America/New_York</code>).</p>
+        }
+      </div>
+
+      {/* Date format */}
+      <div className="space-y-3">
+        <Label>Date Format</Label>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {DATE_FORMAT_OPTIONS.map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setDateFormat(opt.value)}
+              className={`rounded-xl border-2 px-4 py-3 text-left transition-all hover:border-primary/60 ${dateFormat === opt.value ? "border-primary bg-primary/5" : "border-border"}`}
+            >
+              <p className="text-xs font-semibold font-mono">{opt.label}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">{previewDate(opt.value)}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Time format */}
+      <div className="space-y-3">
+        <Label>Time Format</Label>
+        <div className="flex gap-2">
+          {(["24h", "12h"] as const).map(fmt => (
+            <button
+              key={fmt}
+              type="button"
+              onClick={() => setTimeFormat(fmt)}
+              className={`rounded-xl border-2 px-5 py-3 text-left transition-all hover:border-primary/60 ${timeFormat === fmt ? "border-primary bg-primary/5" : "border-border"}`}
+            >
+              <p className="text-xs font-semibold">{fmt === "24h" ? "24-hour" : "12-hour"}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5 font-mono">{previewTime(fmt)}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <Button onClick={handleSave} disabled={saving || !dirty}>
+        {saving ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" />Saving…</> : "Save"}
+      </Button>
+    </div>
+  );
+}
+
 type Theme = "system" | "light" | "dark";
 type DesignTheme = "default" | "slate" | "midnight" | "forest" | "rose" | "obsidian";
 
@@ -703,6 +846,7 @@ export default function SettingsPage() {
           <TabsList className="h-auto flex-wrap">
             <TabsTrigger value="platform">Name</TabsTrigger>
             <TabsTrigger value="visual">Visual</TabsTrigger>
+            <TabsTrigger value="datetime">Date & Time</TabsTrigger>
             <TabsTrigger value="features">Features</TabsTrigger>
             <TabsTrigger value="permissions">Permissions</TabsTrigger>
           </TabsList>
@@ -725,6 +869,9 @@ export default function SettingsPage() {
                 <VisualAppearanceSection />
               </CardContent>
             </Card>
+          </TabsContent>
+          <TabsContent value="datetime">
+            <Card><CardContent className="pt-6"><DateTimeTab /></CardContent></Card>
           </TabsContent>
           <TabsContent value="features">
             <Card><CardContent className="pt-6"><FeaturesTab /></CardContent></Card>

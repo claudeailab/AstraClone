@@ -49,6 +49,8 @@ export function getEnvOverride(key: string): string | undefined {
     case "vivawallet_clientId":     return process.env.WEBAPP_VIVA_CLIENT_ID;
     case "vivawallet_clientSecret": return process.env.WEBAPP_VIVA_CLIENT_SECRET;
     case "vivawallet_merchantId":   return process.env.WEBAPP_VIVA_MERCHANT_ID;
+    // Platform
+    case "platform_timezone":       return process.env.TZ;
     default:                        return undefined;
   }
 }
@@ -62,6 +64,7 @@ export const ENV_SETTING_KEYS = new Set([
   "stripe_enabled","stripe_liveMode","stripe_publishableKey","stripe_secretKey","stripe_webhookSecret",
   "paypal_enabled","paypal_liveMode","paypal_clientId","paypal_clientSecret",
   "vivawallet_enabled","vivawallet_liveMode","vivawallet_clientId","vivawallet_clientSecret","vivawallet_merchantId",
+  "platform_timezone",
 ]);
 
 export function encrypt(plain: string): string {
