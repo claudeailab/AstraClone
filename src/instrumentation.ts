@@ -5,13 +5,13 @@ export async function register() {
   {
     const { db } = await import("./lib/db");
     const stmts = [
-      `CREATE TABLE IF NOT EXISTS \`webapp_settings\` (
+      `CREATE TABLE IF NOT EXISTS \`astraclone_settings\` (
         \`key\` varchar(255) NOT NULL,
         \`value\` text NOT NULL,
         \`updated_at\` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         PRIMARY KEY (\`key\`)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
-      `CREATE TABLE IF NOT EXISTS \`webapp_secret_reminders\` (
+      `CREATE TABLE IF NOT EXISTS \`astraclone_secret_reminders\` (
         \`id\` int NOT NULL AUTO_INCREMENT,
         \`name\` varchar(255) NOT NULL,
         \`expiry_date\` date NOT NULL,
@@ -19,7 +19,7 @@ export async function register() {
         \`created_at\` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (\`id\`)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
-      `CREATE TABLE IF NOT EXISTS \`webapp_permission_groups\` (
+      `CREATE TABLE IF NOT EXISTS \`astraclone_permission_groups\` (
         \`id\` int NOT NULL AUTO_INCREMENT,
         \`name\` varchar(255) NOT NULL,
         \`description\` varchar(500),
@@ -27,7 +27,7 @@ export async function register() {
         \`created_at\` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (\`id\`)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
-      `CREATE TABLE IF NOT EXISTS \`webapp_users\` (
+      `CREATE TABLE IF NOT EXISTS \`astraclone_users\` (
         \`id\` int NOT NULL AUTO_INCREMENT,
         \`email\` varchar(255) NOT NULL,
         \`username\` varchar(255) NULL,
@@ -39,18 +39,18 @@ export async function register() {
         \`last_login_at\` timestamp NULL,
         \`created_at\` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (\`id\`),
-        UNIQUE KEY \`webapp_users_email_unique\` (\`email\`),
-        UNIQUE KEY \`webapp_users_username_unique\` (\`username\`)
+        UNIQUE KEY \`astraclone_users_email_unique\` (\`email\`),
+        UNIQUE KEY \`astraclone_users_username_unique\` (\`username\`)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
-      `CREATE TABLE IF NOT EXISTS \`webapp_sessions\` (
+      `CREATE TABLE IF NOT EXISTS \`astraclone_sessions\` (
         \`id\` varchar(255) NOT NULL,
         \`user_id\` int NOT NULL,
         \`expires_at\` timestamp NOT NULL,
         \`created_at\` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (\`id\`),
-        CONSTRAINT \`webapp_sessions_user_id_fk\` FOREIGN KEY (\`user_id\`) REFERENCES \`webapp_users\` (\`id\`) ON DELETE CASCADE
+        CONSTRAINT \`astraclone_sessions_user_id_fk\` FOREIGN KEY (\`user_id\`) REFERENCES \`astraclone_users\` (\`id\`) ON DELETE CASCADE
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
-      `CREATE TABLE IF NOT EXISTS \`webapp_push_subscriptions\` (
+      `CREATE TABLE IF NOT EXISTS \`astraclone_push_subscriptions\` (
         \`id\` int NOT NULL AUTO_INCREMENT,
         \`user_id\` int NOT NULL,
         \`endpoint\` text NOT NULL,
@@ -58,9 +58,9 @@ export async function register() {
         \`auth\` varchar(255) NOT NULL,
         \`created_at\` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (\`id\`),
-        CONSTRAINT \`webapp_push_sub_user_fk\` FOREIGN KEY (\`user_id\`) REFERENCES \`webapp_users\` (\`id\`) ON DELETE CASCADE
+        CONSTRAINT \`astraclone_push_sub_user_fk\` FOREIGN KEY (\`user_id\`) REFERENCES \`astraclone_users\` (\`id\`) ON DELETE CASCADE
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
-      `CREATE TABLE IF NOT EXISTS \`webapp_plans\` (
+      `CREATE TABLE IF NOT EXISTS \`astraclone_plans\` (
         \`id\` int NOT NULL AUTO_INCREMENT,
         \`name\` varchar(255) NOT NULL,
         \`monthly_price\` int NOT NULL DEFAULT 0,
@@ -72,14 +72,14 @@ export async function register() {
         \`created_at\` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (\`id\`)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
-      `CREATE TABLE IF NOT EXISTS \`webapp_feature_catalog\` (
+      `CREATE TABLE IF NOT EXISTS \`astraclone_feature_catalog\` (
         \`id\` int NOT NULL AUTO_INCREMENT,
         \`name\` varchar(255) NOT NULL,
         \`description\` varchar(500),
         \`created_at\` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (\`id\`)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
-      `CREATE TABLE IF NOT EXISTS \`webapp_audit_logs\` (
+      `CREATE TABLE IF NOT EXISTS \`astraclone_audit_logs\` (
         \`id\` int NOT NULL AUTO_INCREMENT,
         \`user_email\` varchar(255),
         \`action\` varchar(100) NOT NULL,
@@ -96,13 +96,13 @@ export async function register() {
 
     // Schema migrations (no-op if already applied)
     const migrations = [
-      "ALTER TABLE `webapp_users` DROP COLUMN `role`",
-      "ALTER TABLE `webapp_permission_groups` DROP COLUMN `is_default`",
-      "ALTER TABLE `webapp_users` ADD COLUMN `username` varchar(255) NULL",
-      "ALTER TABLE `webapp_users` ADD UNIQUE KEY `webapp_users_username_unique` (`username`)",
-      "ALTER TABLE `webapp_users` ADD COLUMN `disabled` boolean NOT NULL DEFAULT false",
-      "ALTER TABLE `webapp_push_subscriptions` ADD COLUMN `label` varchar(255)",
-      "ALTER TABLE `webapp_push_subscriptions` ADD COLUMN `enabled` boolean NOT NULL DEFAULT true",
+      "ALTER TABLE `astraclone_users` DROP COLUMN `role`",
+      "ALTER TABLE `astraclone_permission_groups` DROP COLUMN `is_default`",
+      "ALTER TABLE `astraclone_users` ADD COLUMN `username` varchar(255) NULL",
+      "ALTER TABLE `astraclone_users` ADD UNIQUE KEY `astraclone_users_username_unique` (`username`)",
+      "ALTER TABLE `astraclone_users` ADD COLUMN `disabled` boolean NOT NULL DEFAULT false",
+      "ALTER TABLE `astraclone_push_subscriptions` ADD COLUMN `label` varchar(255)",
+      "ALTER TABLE `astraclone_push_subscriptions` ADD COLUMN `enabled` boolean NOT NULL DEFAULT true",
     ];
     for (const sql of migrations) {
       try {
@@ -110,27 +110,27 @@ export async function register() {
       } catch { /* column already dropped or doesn't exist */ }
     }
 
-    // Seed feature catalog from WEBAPP_FEATURE_CATALOG (once, if table is empty)
-    if (process.env.WEBAPP_FEATURE_CATALOG) {
+    // Seed feature catalog from ASTRACLONE_FEATURE_CATALOG (once, if table is empty)
+    if (process.env.ASTRACLONE_FEATURE_CATALOG) {
       const { feature_catalog } = await import("./lib/db/schema");
       const { sql: dsql } = await import("drizzle-orm");
       const [{ n }] = await db.select({ n: dsql<number>`COUNT(*)` }).from(feature_catalog);
       if (!Number(n)) {
-        const names = process.env.WEBAPP_FEATURE_CATALOG.split(",").map((s: string) => s.trim()).filter(Boolean);
+        const names = process.env.ASTRACLONE_FEATURE_CATALOG.split(",").map((s: string) => s.trim()).filter(Boolean);
         if (names.length) await db.insert(feature_catalog).values(names.map(name => ({ name })));
-        console.log(`Seeded ${names.length} features from WEBAPP_FEATURE_CATALOG`);
+        console.log(`Seeded ${names.length} features from ASTRACLONE_FEATURE_CATALOG`);
       }
     }
 
-    // Seed plans from WEBAPP_PLANS (once, if plans table is empty)
-    if (process.env.WEBAPP_PLANS) {
+    // Seed plans from ASTRACLONE_PLANS (once, if plans table is empty)
+    if (process.env.ASTRACLONE_PLANS) {
       try {
         const { plans: plansTable } = await import("./lib/db/schema");
         const { sql: dsql } = await import("drizzle-orm");
         const [{ n }] = await db.select({ n: dsql<number>`COUNT(*)` }).from(plansTable);
         if (!Number(n)) {
           type SeedPlan = { name: string; monthlyPrice?: number; yearlyPrice?: number; features?: string[] };
-          const seedPlans: SeedPlan[] = JSON.parse(process.env.WEBAPP_PLANS);
+          const seedPlans: SeedPlan[] = JSON.parse(process.env.ASTRACLONE_PLANS);
           for (const p of seedPlans) {
             await db.insert(plansTable).values({
               name: p.name,
@@ -139,7 +139,7 @@ export async function register() {
               features: JSON.stringify(Array.isArray(p.features) ? p.features : []),
             });
           }
-          console.log(`Seeded ${seedPlans.length} plans from WEBAPP_PLANS`);
+          console.log(`Seeded ${seedPlans.length} plans from ASTRACLONE_PLANS`);
         }
       } catch { /* invalid JSON */ }
     }
@@ -155,7 +155,7 @@ export async function register() {
     },
   });
 
-  if (process.env.WEBAPP_SMTP_ENABLED === "true") {
+  if (process.env.ASTRACLONE_SMTP_ENABLED === "true") {
     checks.push({
       name: "SMTP",
       check: async () => {
@@ -169,7 +169,7 @@ export async function register() {
     });
   }
 
-  if (process.env.WEBAPP_ANTHROPIC_ENABLED === "true") {
+  if (process.env.ASTRACLONE_ANTHROPIC_ENABLED === "true") {
     checks.push({
       name: "Anthropic",
       check: async () => {
@@ -180,7 +180,7 @@ export async function register() {
     });
   }
 
-  if (process.env.WEBAPP_OPENAI_ENABLED === "true") {
+  if (process.env.ASTRACLONE_OPENAI_ENABLED === "true") {
     checks.push({
       name: "OpenAI",
       check: async () => {
@@ -191,7 +191,7 @@ export async function register() {
     });
   }
 
-  if (process.env.WEBAPP_STRIPE_ENABLED === "true") {
+  if (process.env.ASTRACLONE_STRIPE_ENABLED === "true") {
     checks.push({
       name: "Stripe",
       check: async () => {
@@ -202,7 +202,7 @@ export async function register() {
     });
   }
 
-  if (process.env.WEBAPP_M365_ENABLED === "true") {
+  if (process.env.ASTRACLONE_M365_ENABLED === "true") {
     checks.push({
       name: "M365",
       check: async () => {

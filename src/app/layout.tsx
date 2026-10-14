@@ -27,9 +27,9 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const cookieStore = await cookies();
-  const theme = cookieStore.get("webapp-theme")?.value;
+  const theme = cookieStore.get("astraclone-theme")?.value;
   const dataTheme = theme === "light" || theme === "dark" ? theme : undefined;
-  const rawDesign = cookieStore.get("webapp-design-theme")?.value;
+  const rawDesign = cookieStore.get("astraclone-design-theme")?.value;
   const DESIGN_THEMES = ["default", "slate", "midnight", "forest", "rose", "obsidian"];
   const dataDesign = rawDesign && DESIGN_THEMES.includes(rawDesign) && rawDesign !== "default" ? rawDesign : undefined;
   const platform = await getPlatformInfo();

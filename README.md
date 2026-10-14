@@ -67,61 +67,61 @@ Add the service to your `docker-compose.yml` and define the variables in a `.env
 
 ```yaml
 services:
-  webapp:
-    image: ghcr.io/claudeailab/webapp
-    container_name: webapp
-    hostname: webapp
+  astraclone:
+    image: ghcr.io/claudeailab/astraclone
+    container_name: astraclone
+    hostname: astraclone
     restart: unless-stopped
     user: "0"
     environment:
       TZ: ${TZ}
 
-      WEBAPP_JWT_SECRET: ${WEBAPP_JWT_SECRET}
-      WEBAPP_ENCRYPTION_KEY: ${WEBAPP_ENCRYPTION_KEY}
-      WEBAPP_ADMIN_JWT_SECRET: ${WEBAPP_ADMIN_JWT_SECRET}
+      ASTRACLONE_JWT_SECRET: ${ASTRACLONE_JWT_SECRET}
+      ASTRACLONE_ENCRYPTION_KEY: ${ASTRACLONE_ENCRYPTION_KEY}
+      ASTRACLONE_ADMIN_JWT_SECRET: ${ASTRACLONE_ADMIN_JWT_SECRET}
 
-      WEBAPP_ADMIN_USERNAME: ${WEBAPP_ADMIN_USERNAME}
-      WEBAPP_ADMIN_PASSWORD: ${WEBAPP_ADMIN_PASSWORD}
+      ASTRACLONE_ADMIN_USERNAME: ${ASTRACLONE_ADMIN_USERNAME}
+      ASTRACLONE_ADMIN_PASSWORD: ${ASTRACLONE_ADMIN_PASSWORD}
 
-      WEBAPP_DB_HOST: ${WEBAPP_DB_HOST}
-      WEBAPP_DB_PORT: ${WEBAPP_DB_PORT}
-      WEBAPP_DB_USER: ${WEBAPP_DB_USER}
-      WEBAPP_DB_NAME: ${WEBAPP_DB_NAME}
-      WEBAPP_DB_PASSWORD: ${WEBAPP_DB_PASSWORD}
+      ASTRACLONE_DB_HOST: ${ASTRACLONE_DB_HOST}
+      ASTRACLONE_DB_PORT: ${ASTRACLONE_DB_PORT}
+      ASTRACLONE_DB_USER: ${ASTRACLONE_DB_USER}
+      ASTRACLONE_DB_NAME: ${ASTRACLONE_DB_NAME}
+      ASTRACLONE_DB_PASSWORD: ${ASTRACLONE_DB_PASSWORD}
 
-      WEBAPP_SMTP_ENABLED: ${WEBAPP_SMTP_ENABLED}
-      WEBAPP_SMTP_SSL: ${WEBAPP_SMTP_SSL}
-      WEBAPP_SMTP_HOST: ${WEBAPP_SMTP_HOST}
-      WEBAPP_SMTP_PORT: ${WEBAPP_SMTP_PORT}
-      WEBAPP_SMTP_USER: ${WEBAPP_SMTP_USER}
-      WEBAPP_SMTP_PASSWORD: ${WEBAPP_SMTP_PASSWORD}
-      WEBAPP_SMTP_FROM_NAME: ${WEBAPP_SMTP_FROM_NAME}
-      WEBAPP_SMTP_FROM_EMAIL: ${WEBAPP_SMTP_FROM_EMAIL}
+      ASTRACLONE_SMTP_ENABLED: ${ASTRACLONE_SMTP_ENABLED}
+      ASTRACLONE_SMTP_SSL: ${ASTRACLONE_SMTP_SSL}
+      ASTRACLONE_SMTP_HOST: ${ASTRACLONE_SMTP_HOST}
+      ASTRACLONE_SMTP_PORT: ${ASTRACLONE_SMTP_PORT}
+      ASTRACLONE_SMTP_USER: ${ASTRACLONE_SMTP_USER}
+      ASTRACLONE_SMTP_PASSWORD: ${ASTRACLONE_SMTP_PASSWORD}
+      ASTRACLONE_SMTP_FROM_NAME: ${ASTRACLONE_SMTP_FROM_NAME}
+      ASTRACLONE_SMTP_FROM_EMAIL: ${ASTRACLONE_SMTP_FROM_EMAIL}
 
-      WEBAPP_M365_ENABLED: ${WEBAPP_M365_ENABLED}
-      WEBAPP_M365_CLIENT_ID: ${WEBAPP_M365_CLIENT_ID}
-      WEBAPP_M365_TENANT_ID: ${WEBAPP_M365_TENANT_ID}
-      WEBAPP_M365_CLIENT_SECRET: ${WEBAPP_M365_CLIENT_SECRET}
-      WEBAPP_M365_EXPIRY_DATE: ${WEBAPP_M365_EXPIRY_DATE}
-      WEBAPP_M365_REMINDER_DAYS: ${WEBAPP_M365_REMINDER_DAYS}
+      ASTRACLONE_M365_ENABLED: ${ASTRACLONE_M365_ENABLED}
+      ASTRACLONE_M365_CLIENT_ID: ${ASTRACLONE_M365_CLIENT_ID}
+      ASTRACLONE_M365_TENANT_ID: ${ASTRACLONE_M365_TENANT_ID}
+      ASTRACLONE_M365_CLIENT_SECRET: ${ASTRACLONE_M365_CLIENT_SECRET}
+      ASTRACLONE_M365_EXPIRY_DATE: ${ASTRACLONE_M365_EXPIRY_DATE}
+      ASTRACLONE_M365_REMINDER_DAYS: ${ASTRACLONE_M365_REMINDER_DAYS}
 
-      WEBAPP_STRIPE_ENABLED: ${WEBAPP_STRIPE_ENABLED}
-      WEBAPP_STRIPE_LIVE_MODE: ${WEBAPP_STRIPE_LIVE_MODE}
-      WEBAPP_STRIPE_PUBLISHABLE_KEY: ${WEBAPP_STRIPE_PUBLISHABLE_KEY}
-      WEBAPP_STRIPE_SECRET_KEY: ${WEBAPP_STRIPE_SECRET_KEY}
-      WEBAPP_STRIPE_WEBHOOK_SECRET: ${WEBAPP_STRIPE_WEBHOOK_SECRET}
+      ASTRACLONE_STRIPE_ENABLED: ${ASTRACLONE_STRIPE_ENABLED}
+      ASTRACLONE_STRIPE_LIVE_MODE: ${ASTRACLONE_STRIPE_LIVE_MODE}
+      ASTRACLONE_STRIPE_PUBLISHABLE_KEY: ${ASTRACLONE_STRIPE_PUBLISHABLE_KEY}
+      ASTRACLONE_STRIPE_SECRET_KEY: ${ASTRACLONE_STRIPE_SECRET_KEY}
+      ASTRACLONE_STRIPE_WEBHOOK_SECRET: ${ASTRACLONE_STRIPE_WEBHOOK_SECRET}
 
-      WEBAPP_ANTHROPIC_ENABLED: ${WEBAPP_ANTHROPIC_ENABLED}
-      WEBAPP_ANTHROPIC_MODEL: ${WEBAPP_ANTHROPIC_MODEL}
-      WEBAPP_ANTHROPIC_API_KEY: ${WEBAPP_ANTHROPIC_API_KEY}
+      ASTRACLONE_ANTHROPIC_ENABLED: ${ASTRACLONE_ANTHROPIC_ENABLED}
+      ASTRACLONE_ANTHROPIC_MODEL: ${ASTRACLONE_ANTHROPIC_MODEL}
+      ASTRACLONE_ANTHROPIC_API_KEY: ${ASTRACLONE_ANTHROPIC_API_KEY}
 
-      WEBAPP_OPENAI_ENABLED: ${WEBAPP_OPENAI_ENABLED}
-      WEBAPP_OPENAI_MODEL: ${WEBAPP_OPENAI_MODEL}
-      WEBAPP_OPENAI_API_KEY: ${WEBAPP_OPENAI_API_KEY}
+      ASTRACLONE_OPENAI_ENABLED: ${ASTRACLONE_OPENAI_ENABLED}
+      ASTRACLONE_OPENAI_MODEL: ${ASTRACLONE_OPENAI_MODEL}
+      ASTRACLONE_OPENAI_API_KEY: ${ASTRACLONE_OPENAI_API_KEY}
     ports:
-      - 8095:8095
+      - 8030:8030
     volumes:
-      - ./config/webapp/data:/data
+      - ./config/astraclone/data:/data
     networks:
       - network
     depends_on:
@@ -133,7 +133,7 @@ services:
         - wget
         - -qO
         - /dev/null
-        - http://127.0.0.1:8095/api/health
+        - http://127.0.0.1:8030/api/health
       interval: 30s
       timeout: 5s
       retries: 3
@@ -157,47 +157,47 @@ Setting any of these env vars pre-configures that integration in the admin UI â€
 | Variable | Description |
 |---|---|
 | `TZ` | Timezone (e.g. `UTC`) |
-| `WEBAPP_JWT_SECRET` | Session signing secret |
-| `WEBAPP_ADMIN_JWT_SECRET` | Admin JWT signing secret |
-| `WEBAPP_ENCRYPTION_KEY` | 64-char hex key for AES-256-GCM settings encryption |
-| `WEBAPP_ADMIN_USERNAME` | Seeds first admin user on first boot (used as login username) |
-| `WEBAPP_ADMIN_PASSWORD` | Seeds first admin password on first boot |
-| `WEBAPP_DB_HOST` | MySQL host |
-| `WEBAPP_DB_PORT` | MySQL port (default: `3306`) |
-| `WEBAPP_DB_USER` | MySQL user |
-| `WEBAPP_DB_PASSWORD` | MySQL password |
-| `WEBAPP_DB_NAME` | MySQL database name |
-| `WEBAPP_ANTHROPIC_ENABLED` | Enable Anthropic (`true`/`false`, default `true`) |
-| `WEBAPP_ANTHROPIC_API_KEY` | Anthropic API key |
-| `WEBAPP_ANTHROPIC_MODEL` | Anthropic model (default: `claude-sonnet-4-6`) |
-| `WEBAPP_OPENAI_ENABLED` | Enable OpenAI (`true`/`false`, default `true`) |
-| `WEBAPP_OPENAI_API_KEY` | OpenAI API key |
-| `WEBAPP_OPENAI_MODEL` | OpenAI model (default: `gpt-4o`) |
-| `WEBAPP_SMTP_ENABLED` | Enable SMTP email (`true`/`false`, default `true`) |
-| `WEBAPP_SMTP_HOST` | SMTP hostname |
-| `WEBAPP_SMTP_PORT` | SMTP port |
-| `WEBAPP_SMTP_SSL` | SMTP TLS (`true`/`false`) |
-| `WEBAPP_SMTP_USER` | SMTP username |
-| `WEBAPP_SMTP_PASSWORD` | SMTP password |
-| `WEBAPP_SMTP_FROM_NAME` | Sender display name |
-| `WEBAPP_SMTP_FROM_EMAIL` | Sender email address |
-| `WEBAPP_M365_ENABLED` | Enable Microsoft 365 (`true`/`false`, default `true`) |
-| `WEBAPP_M365_CLIENT_ID` | Azure app client ID |
-| `WEBAPP_M365_CLIENT_SECRET` | Azure app client secret |
-| `WEBAPP_M365_TENANT_ID` | Azure tenant ID |
-| `WEBAPP_M365_EXPIRY_DATE` | Secret expiry date (ISO, e.g. `"2027-01-01"`) |
-| `WEBAPP_M365_REMINDER_DAYS` | Days before expiry to remind (default: `30`) |
-| `WEBAPP_STRIPE_ENABLED` | Enable Stripe (`true`/`false`, default `true`) |
-| `WEBAPP_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key |
-| `WEBAPP_STRIPE_SECRET_KEY` | Stripe secret key |
-| `WEBAPP_STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret |
-| `WEBAPP_STRIPE_LIVE_MODE` | Stripe live mode (`true`/`false`) |
-| `WEBAPP_PAYPAL_ENABLED` | Enable PayPal (`true`/`false`) |
-| `WEBAPP_PAYPAL_CLIENT_ID` | PayPal client ID |
-| `WEBAPP_PAYPAL_CLIENT_SECRET` | PayPal client secret |
-| `WEBAPP_PAYPAL_LIVE_MODE` | PayPal live mode (`true`/`false`) |
-| `WEBAPP_VIVA_ENABLED` | Enable Viva Wallet (`true`/`false`) |
-| `WEBAPP_VIVA_CLIENT_ID` | Viva Wallet client ID |
-| `WEBAPP_VIVA_CLIENT_SECRET` | Viva Wallet client secret |
-| `WEBAPP_VIVA_MERCHANT_ID` | Viva Wallet merchant ID |
-| `WEBAPP_VIVA_LIVE_MODE` | Viva Wallet live mode (`true`/`false`) |
+| `ASTRACLONE_JWT_SECRET` | Session signing secret |
+| `ASTRACLONE_ADMIN_JWT_SECRET` | Admin JWT signing secret |
+| `ASTRACLONE_ENCRYPTION_KEY` | 64-char hex key for AES-256-GCM settings encryption |
+| `ASTRACLONE_ADMIN_USERNAME` | Seeds first admin user on first boot (used as login username) |
+| `ASTRACLONE_ADMIN_PASSWORD` | Seeds first admin password on first boot |
+| `ASTRACLONE_DB_HOST` | MySQL host |
+| `ASTRACLONE_DB_PORT` | MySQL port (default: `3306`) |
+| `ASTRACLONE_DB_USER` | MySQL user |
+| `ASTRACLONE_DB_PASSWORD` | MySQL password |
+| `ASTRACLONE_DB_NAME` | MySQL database name |
+| `ASTRACLONE_ANTHROPIC_ENABLED` | Enable Anthropic (`true`/`false`, default `true`) |
+| `ASTRACLONE_ANTHROPIC_API_KEY` | Anthropic API key |
+| `ASTRACLONE_ANTHROPIC_MODEL` | Anthropic model (default: `claude-sonnet-4-6`) |
+| `ASTRACLONE_OPENAI_ENABLED` | Enable OpenAI (`true`/`false`, default `true`) |
+| `ASTRACLONE_OPENAI_API_KEY` | OpenAI API key |
+| `ASTRACLONE_OPENAI_MODEL` | OpenAI model (default: `gpt-4o`) |
+| `ASTRACLONE_SMTP_ENABLED` | Enable SMTP email (`true`/`false`, default `true`) |
+| `ASTRACLONE_SMTP_HOST` | SMTP hostname |
+| `ASTRACLONE_SMTP_PORT` | SMTP port |
+| `ASTRACLONE_SMTP_SSL` | SMTP TLS (`true`/`false`) |
+| `ASTRACLONE_SMTP_USER` | SMTP username |
+| `ASTRACLONE_SMTP_PASSWORD` | SMTP password |
+| `ASTRACLONE_SMTP_FROM_NAME` | Sender display name |
+| `ASTRACLONE_SMTP_FROM_EMAIL` | Sender email address |
+| `ASTRACLONE_M365_ENABLED` | Enable Microsoft 365 (`true`/`false`, default `true`) |
+| `ASTRACLONE_M365_CLIENT_ID` | Azure app client ID |
+| `ASTRACLONE_M365_CLIENT_SECRET` | Azure app client secret |
+| `ASTRACLONE_M365_TENANT_ID` | Azure tenant ID |
+| `ASTRACLONE_M365_EXPIRY_DATE` | Secret expiry date (ISO, e.g. `"2027-01-01"`) |
+| `ASTRACLONE_M365_REMINDER_DAYS` | Days before expiry to remind (default: `30`) |
+| `ASTRACLONE_STRIPE_ENABLED` | Enable Stripe (`true`/`false`, default `true`) |
+| `ASTRACLONE_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key |
+| `ASTRACLONE_STRIPE_SECRET_KEY` | Stripe secret key |
+| `ASTRACLONE_STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret |
+| `ASTRACLONE_STRIPE_LIVE_MODE` | Stripe live mode (`true`/`false`) |
+| `ASTRACLONE_PAYPAL_ENABLED` | Enable PayPal (`true`/`false`) |
+| `ASTRACLONE_PAYPAL_CLIENT_ID` | PayPal client ID |
+| `ASTRACLONE_PAYPAL_CLIENT_SECRET` | PayPal client secret |
+| `ASTRACLONE_PAYPAL_LIVE_MODE` | PayPal live mode (`true`/`false`) |
+| `ASTRACLONE_VIVA_ENABLED` | Enable Viva Wallet (`true`/`false`) |
+| `ASTRACLONE_VIVA_CLIENT_ID` | Viva Wallet client ID |
+| `ASTRACLONE_VIVA_CLIENT_SECRET` | Viva Wallet client secret |
+| `ASTRACLONE_VIVA_MERCHANT_ID` | Viva Wallet merchant ID |
+| `ASTRACLONE_VIVA_LIVE_MODE` | Viva Wallet live mode (`true`/`false`) |

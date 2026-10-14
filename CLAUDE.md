@@ -26,7 +26,7 @@
 
 ## ENV Prefix
 
-`WEBAPP_` — all secrets here, never `NEXT_PUBLIC_*`
+`ASTRACLONE_` — all secrets here, never `NEXT_PUBLIC_*`
 
 ## CCR Proxy Restrictions (Claude Code Remote)
 

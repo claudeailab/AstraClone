@@ -7,7 +7,7 @@ const schema = z.object({ designTheme: z.enum(DESIGN_THEMES) });
 
 export async function GET(req: NextRequest) {
   await requireAdmin();
-  const val = req.cookies.get("webapp-design-theme")?.value ?? "default";
+  const val = req.cookies.get("astraclone-design-theme")?.value ?? "default";
   const designTheme = (DESIGN_THEMES as readonly string[]).includes(val) ? val : "default";
   return NextResponse.json({ designTheme });
 }
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   const { designTheme } = parsed.data;
   const isSecure = req.headers.get("x-forwarded-proto") === "https";
   const res = NextResponse.json({ ok: true });
-  res.cookies.set("webapp-design-theme", designTheme, {
+  res.cookies.set("astraclone-design-theme", designTheme, {
     httpOnly: false,
     secure: isSecure,
     sameSite: "lax",

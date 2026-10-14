@@ -102,7 +102,7 @@ export async function GET(req: NextRequest) {
   const isSecure = req.headers.get("x-forwarded-proto") === "https";
 
   const res = NextResponse.redirect(`${base}${redirectPath}`);
-  res.cookies.set("webapp-session", token, {
+  res.cookies.set("astraclone-session", token, {
     httpOnly: true,
     secure: isSecure,
     sameSite: "lax",

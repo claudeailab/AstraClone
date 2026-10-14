@@ -819,7 +819,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const stored = document.cookie.match(/webapp-theme=([^;]+)/)?.[1] as Theme | undefined;
+    const stored = document.cookie.match(/astraclone-theme=([^;]+)/)?.[1] as Theme | undefined;
     if (stored === "light" || stored === "dark" || stored === "system") setTheme(stored);
   }, []);
 

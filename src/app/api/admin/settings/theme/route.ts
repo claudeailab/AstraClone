@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
   const { theme } = parsed.data;
   const isSecure = req.headers.get("x-forwarded-proto") === "https";
   const res = NextResponse.json({ ok: true });
-  res.cookies.set("webapp-theme", theme, {
+  res.cookies.set("astraclone-theme", theme, {
     httpOnly: false,
     secure: isSecure,
     sameSite: "lax",

@@ -3,10 +3,10 @@ import { deleteSession } from "@/lib/auth";
 import { getBaseUrl } from "@/lib/base-url";
 
 async function logout(req: NextRequest) {
-  const token = req.cookies.get("webapp-session")?.value;
+  const token = req.cookies.get("astraclone-session")?.value;
   if (token) await deleteSession(token);
   const res = NextResponse.redirect(`${getBaseUrl(req)}/login`);
-  res.cookies.delete("webapp-session");
+  res.cookies.delete("astraclone-session");
   return res;
 }
 

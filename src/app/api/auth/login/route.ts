@@ -23,8 +23,8 @@ export async function POST(req: NextRequest) {
   const { username, password } = parsed.data;
 
   // Auto-seed first admin with Administrators group
-  const adminUsername = process.env.WEBAPP_ADMIN_USERNAME;
-  const adminPassword = process.env.WEBAPP_ADMIN_PASSWORD;
+  const adminUsername = process.env.ASTRACLONE_ADMIN_USERNAME;
+  const adminPassword = process.env.ASTRACLONE_ADMIN_PASSWORD;
   if (adminUsername && adminPassword) {
     const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.username, adminUsername)).limit(1);
     if (!existing) {
@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
   await logAudit({ userEmail: user.username ?? user.email, action: "login", resource: "auth", ip });
 
   const res = NextResponse.json({ redirect: redirectPath });
-  res.cookies.set("webapp-session", token, {
+  res.cookies.set("astraclone-session", token, {
     httpOnly: true,
     secure: isSecure,
     sameSite: "lax",

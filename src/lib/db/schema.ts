@@ -1,12 +1,12 @@
 import { mysqlTable, varchar, text, timestamp, int, boolean, date } from "drizzle-orm/mysql-core";
 
-export const settings = mysqlTable("webapp_settings", {
+export const settings = mysqlTable("astraclone_settings", {
   key: varchar("key", { length: 255 }).primaryKey(),
   value: text("value").notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 });
 
-export const secret_reminders = mysqlTable("webapp_secret_reminders", {
+export const secret_reminders = mysqlTable("astraclone_secret_reminders", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   expiryDate: date("expiry_date").notNull(),
@@ -14,7 +14,7 @@ export const secret_reminders = mysqlTable("webapp_secret_reminders", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const permission_groups = mysqlTable("webapp_permission_groups", {
+export const permission_groups = mysqlTable("astraclone_permission_groups", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   description: varchar("description", { length: 500 }),
@@ -22,7 +22,7 @@ export const permission_groups = mysqlTable("webapp_permission_groups", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const users = mysqlTable("webapp_users", {
+export const users = mysqlTable("astraclone_users", {
   id: int("id").autoincrement().primaryKey(),
   email: varchar("email", { length: 255 }).notNull().unique(),
   username: varchar("username", { length: 255 }).unique(),
@@ -36,14 +36,14 @@ export const users = mysqlTable("webapp_users", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const sessions = mysqlTable("webapp_sessions", {
+export const sessions = mysqlTable("astraclone_sessions", {
   id: varchar("id", { length: 255 }).primaryKey(),
   userId: int("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const audit_logs = mysqlTable("webapp_audit_logs", {
+export const audit_logs = mysqlTable("astraclone_audit_logs", {
   id: int("id").autoincrement().primaryKey(),
   userEmail: varchar("user_email", { length: 255 }),
   action: varchar("action", { length: 100 }).notNull(),
@@ -53,7 +53,7 @@ export const audit_logs = mysqlTable("webapp_audit_logs", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const push_subscriptions = mysqlTable("webapp_push_subscriptions", {
+export const push_subscriptions = mysqlTable("astraclone_push_subscriptions", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   endpoint: text("endpoint").notNull(),
@@ -64,14 +64,14 @@ export const push_subscriptions = mysqlTable("webapp_push_subscriptions", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const feature_catalog = mysqlTable("webapp_feature_catalog", {
+export const feature_catalog = mysqlTable("astraclone_feature_catalog", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   description: varchar("description", { length: 500 }),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const plans = mysqlTable("webapp_plans", {
+export const plans = mysqlTable("astraclone_plans", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   monthlyPrice: int("monthly_price").notNull().default(0),

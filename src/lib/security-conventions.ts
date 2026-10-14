@@ -16,6 +16,6 @@
 
 export const SECURITY_CONVENTIONS = {
   maxQueryLimit: 100,
-  sessionCookieName: "webapp-session",
+  sessionCookieName: "astraclone-session",
   loginRateLimit: { limit: 10, windowMs: 60_000 },
 } as const;
