@@ -81,3 +81,14 @@ MySQL + Drizzle ORM. Table prefix: `astraclone_`. Auto-migrated on startup. AES-
 ## MCP GitHub Tools (vs curl)
 
 Always prefer `mcp__github__*` tools over curl for GitHub API calls — the MCP server is not subject to CCR proxy restrictions. Use curl only for GHCR registry API (`ghcr.io/v2/...`) or non-Actions GitHub REST reads.
+
+## Repository Synchronization
+
+- Tables: `astraclone_github_connections` (token AES-encrypted), `astraclone_repositories`, `astraclone_syncs`, `astraclone_sync_runs` (last 50 per sync kept). Created in `src/instrumentation.ts`.
+- Engine: `src/lib/sync-git.ts` (pure git logic, testable against local bare repos) + `src/lib/sync-engine.ts` (DB orchestration, in-process scheduler started from `instrumentation.ts`, 60s tick, one run per sync at a time, `running` rows reset to `failed` on restart).
+- Git runs via `execFile` (no shell) in a bare repo under `os.tmpdir()/astraclone-sync/<syncId>`; auth header passed through `GIT_CONFIG_COUNT/KEY/VALUE` env vars — never argv or URL. Image installs `git` (`apk add git`).
+- Rules: fast-forward only; one-way may force-push when `forcePush`; two-way never forces; branches never deleted; conflicts reported, not resolved.
+- GitHub REST calls live in `src/lib/github.ts` (`verifyToken`, `inspectRepo`, `parseRepoRef`).
+- Shared client-safe types/status styles: `src/lib/sync-shared.ts`; shared UI: `src/components/sync/SyncDisplay.tsx` (used by admin and user views).
+- Admin pages: `/admin/management/{accounts,repositories,syncs}`; user page: `/dashboard` (`/api/syncs`, any signed-in user). Deleting an account/repository in use returns 409.
+- User area header (`src/components/user/UserHeader.tsx`) holds the profile menu with the version.

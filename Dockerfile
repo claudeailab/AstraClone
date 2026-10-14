@@ -3,7 +3,8 @@
 FROM node:22-alpine AS runner
 WORKDIR /app
 
-RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 appuser
+RUN apk add --no-cache git && \
+    addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 appuser
 
 # Pre-built output uploaded by the build-app CI job
 COPY --chown=appuser:nodejs public ./public

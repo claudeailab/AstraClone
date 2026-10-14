@@ -1,8 +1,19 @@
-# Platform
+# AstraClone
 
-A production-ready Next.js SaaS foundation with admin panel, multi-provider auth, user management, AI integrations, payments, M365 SSO, SMTP, and PWA support. Built to deploy and extend.
+Keeps GitHub repositories in sync. Add GitHub accounts and repositories, define which repository synchronizes to which (one-way or two-way, which branches, how often), and AstraClone monitors and synchronizes them continuously. Users get a live status dashboard; admins manage everything from the admin panel.
 
 ## Features
+
+### Repository Synchronization
+- **Admin → Management → GitHub Accounts**: store personal access tokens (encrypted, verified against GitHub on save, "Test" button)
+- **Admin → Management → Repositories**: add repositories as `owner/name` or a github.com URL; access, visibility and push permission are verified with the chosen account
+- **Admin → Management → Synchronizations**: pick source and destination, direction, branch filter (comma-separated, `*` wildcards), tag sync, check interval, enable/pause, optional force push (one-way only); "Run now" and full run history with per-branch details
+- **One-way**: new branches and tags are created on the destination and branches are fast-forwarded; if the destination has commits the source doesn't, the branch is reported as a conflict and left untouched (unless force push is on)
+- **Two-way**: whichever side is ahead is fast-forwarded into the other; new branches and tags are copied both ways; branches changed on both sides are reported as conflicts and never overwritten
+- **User dashboard** (`/dashboard`): live status of every synchronization (in sync / conflict / failed / running), last result, next run and recent run history
+- Branches are never deleted; credentials are passed to `git` via environment, never via the command line or URLs
+
+**Token permissions:** classic PAT with `repo` scope, or fine-grained PAT with Contents read/write on the repositories. Add the `workflow` scope (classic) or Workflows write (fine-grained) if synchronized branches change files under `.github/workflows`.
 
 ### Auth & Users
 - Local email/password auth (bcrypt, session tokens)

@@ -89,6 +89,58 @@ export async function register() {
         \`created_at\` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (\`id\`)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS \`astraclone_github_connections\` (
+        \`id\` int NOT NULL AUTO_INCREMENT,
+        \`name\` varchar(255) NOT NULL,
+        \`username\` varchar(255) NOT NULL,
+        \`token\` text NOT NULL,
+        \`created_at\` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (\`id\`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS \`astraclone_repositories\` (
+        \`id\` int NOT NULL AUTO_INCREMENT,
+        \`connection_id\` int NOT NULL,
+        \`owner\` varchar(100) NOT NULL,
+        \`name\` varchar(100) NOT NULL,
+        \`is_private\` tinyint(1) NOT NULL DEFAULT 0,
+        \`can_push\` tinyint(1) NOT NULL DEFAULT 0,
+        \`default_branch\` varchar(255),
+        \`created_at\` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (\`id\`),
+        CONSTRAINT \`astraclone_repositories_connection_fk\` FOREIGN KEY (\`connection_id\`) REFERENCES \`astraclone_github_connections\` (\`id\`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS \`astraclone_syncs\` (
+        \`id\` int NOT NULL AUTO_INCREMENT,
+        \`name\` varchar(255) NOT NULL,
+        \`source_repo_id\` int NOT NULL,
+        \`dest_repo_id\` int NOT NULL,
+        \`direction\` varchar(20) NOT NULL DEFAULT 'one_way',
+        \`branches\` varchar(1000) NOT NULL DEFAULT '',
+        \`sync_tags\` tinyint(1) NOT NULL DEFAULT 1,
+        \`force_push\` tinyint(1) NOT NULL DEFAULT 0,
+        \`interval_minutes\` int NOT NULL DEFAULT 15,
+        \`enabled\` tinyint(1) NOT NULL DEFAULT 1,
+        \`last_status\` varchar(20) NOT NULL DEFAULT 'pending',
+        \`last_message\` text,
+        \`last_run_at\` timestamp NULL,
+        \`created_at\` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (\`id\`),
+        CONSTRAINT \`astraclone_syncs_source_fk\` FOREIGN KEY (\`source_repo_id\`) REFERENCES \`astraclone_repositories\` (\`id\`),
+        CONSTRAINT \`astraclone_syncs_dest_fk\` FOREIGN KEY (\`dest_repo_id\`) REFERENCES \`astraclone_repositories\` (\`id\`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+      `CREATE TABLE IF NOT EXISTS \`astraclone_sync_runs\` (
+        \`id\` int NOT NULL AUTO_INCREMENT,
+        \`sync_id\` int NOT NULL,
+        \`triggered_by\` varchar(20) NOT NULL,
+        \`status\` varchar(20) NOT NULL,
+        \`message\` text,
+        \`details\` text,
+        \`started_at\` timestamp NOT NULL,
+        \`finished_at\` timestamp NULL,
+        PRIMARY KEY (\`id\`),
+        KEY \`astraclone_sync_runs_sync_idx\` (\`sync_id\`, \`started_at\`),
+        CONSTRAINT \`astraclone_sync_runs_sync_fk\` FOREIGN KEY (\`sync_id\`) REFERENCES \`astraclone_syncs\` (\`id\`) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
     ];
     for (const sql of stmts) {
       await db.execute(sql as unknown as Parameters<typeof db.execute>[0]);
@@ -211,6 +263,11 @@ export async function register() {
         if (!clientId) throw new Error("M365 not configured");
       },
     });
+  }
+
+  {
+    const { startSyncScheduler } = await import("./lib/sync-engine");
+    await startSyncScheduler();
   }
 
   // Schedule daily M365 client secret expiry reminders

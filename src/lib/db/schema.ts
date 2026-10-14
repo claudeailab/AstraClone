@@ -82,3 +82,50 @@ export const plans = mysqlTable("astraclone_plans", {
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+export const github_connections = mysqlTable("astraclone_github_connections", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  username: varchar("username", { length: 255 }).notNull(),
+  token: text("token").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const repositories = mysqlTable("astraclone_repositories", {
+  id: int("id").autoincrement().primaryKey(),
+  connectionId: int("connection_id").notNull().references(() => github_connections.id),
+  owner: varchar("owner", { length: 100 }).notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  isPrivate: boolean("is_private").notNull().default(false),
+  canPush: boolean("can_push").notNull().default(false),
+  defaultBranch: varchar("default_branch", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const syncs = mysqlTable("astraclone_syncs", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  sourceRepoId: int("source_repo_id").notNull().references(() => repositories.id),
+  destRepoId: int("dest_repo_id").notNull().references(() => repositories.id),
+  direction: varchar("direction", { length: 20 }).notNull().default("one_way"),
+  branches: varchar("branches", { length: 1000 }).notNull().default(""),
+  syncTags: boolean("sync_tags").notNull().default(true),
+  forcePush: boolean("force_push").notNull().default(false),
+  intervalMinutes: int("interval_minutes").notNull().default(15),
+  enabled: boolean("enabled").notNull().default(true),
+  lastStatus: varchar("last_status", { length: 20 }).notNull().default("pending"),
+  lastMessage: text("last_message"),
+  lastRunAt: timestamp("last_run_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const sync_runs = mysqlTable("astraclone_sync_runs", {
+  id: int("id").autoincrement().primaryKey(),
+  syncId: int("sync_id").notNull().references(() => syncs.id, { onDelete: "cascade" }),
+  triggeredBy: varchar("triggered_by", { length: 20 }).notNull(),
+  status: varchar("status", { length: 20 }).notNull(),
+  message: text("message"),
+  details: text("details"),
+  startedAt: timestamp("started_at").notNull(),
+  finishedAt: timestamp("finished_at"),
+});

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Settings, Users, CreditCard, Mail, Bot, SlidersHorizontal, Menu, X, LogOut, Sparkles, Bell, ClipboardList } from "lucide-react";
+import { LayoutDashboard, Settings, Users, CreditCard, Mail, Bot, SlidersHorizontal, Menu, X, LogOut, Sparkles, Bell, ClipboardList, KeyRound, FolderGit2, RefreshCw } from "lucide-react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { cn } from "@/lib/utils";
 import type { Features } from "@/lib/features";
@@ -30,8 +30,15 @@ export default function AdminSidebar({ user, features, platform }: Props) {
 
   const handleLogout = () => { window.location.href = "/api/auth/logout"; };
 
-  const allNavItems: NavItem[] = [
-    { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
+  const dashboardItem: NavItem = { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true };
+
+  const managementItems: NavItem[] = [
+    { href: "/admin/management/accounts", label: "GitHub Accounts", icon: KeyRound },
+    { href: "/admin/management/repositories", label: "Repositories", icon: FolderGit2 },
+    { href: "/admin/management/syncs", label: "Synchronizations", icon: RefreshCw },
+  ];
+
+  const systemItems: NavItem[] = [
     { href: "/admin/settings", label: "Settings", icon: SlidersHorizontal },
     ...(features.audit ? [{ href: "/admin/audit", label: "Audit", icon: ClipboardList }] : []),
     ...(features.users ? [{ href: "/admin/users", label: "Users", icon: Users }] : []),
@@ -63,7 +70,24 @@ export default function AdminSidebar({ user, features, platform }: Props) {
     );
   };
 
-  const systemItems: NavItem[] = allNavItems.filter(i => i.href !== "/admin");
+  const sections = [
+    { title: "Management", items: managementItems },
+    { title: "System", items: systemItems },
+  ];
+
+  const navSections = (onClick?: () => void, inDrawer = false) => (
+    <>
+      {navLink(dashboardItem, onClick, inDrawer)}
+      {sections.map(section => (
+        <div key={section.title} className="mt-3">
+          <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{section.title}</p>
+          <div className="flex flex-col">
+            {section.items.map(item => navLink(item, onClick, inDrawer))}
+          </div>
+        </div>
+      ))}
+    </>
+  );
 
   return (
     <>
@@ -91,13 +115,7 @@ export default function AdminSidebar({ user, features, platform }: Props) {
         </div>
 
         <nav className="flex-1 overflow-y-auto p-3 flex flex-col">
-          {navLink({ href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true })}
-          <div className="mt-3">
-            <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">System</p>
-            <div className="flex flex-col">
-              {systemItems.map(item => navLink(item))}
-            </div>
-          </div>
+          {navSections()}
         </nav>
 
         <div className="p-3 border-t space-y-1">
@@ -186,7 +204,7 @@ export default function AdminSidebar({ user, features, platform }: Props) {
 
             {/* Nav */}
             <nav className="flex-1 overflow-y-auto p-3 flex flex-col">
-              {allNavItems.map(item => navLink(item, () => setDrawerOpen(false), true))}
+              {navSections(() => setDrawerOpen(false), true)}
             </nav>
 
             {/* User + logout */}
