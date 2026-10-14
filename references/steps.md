@@ -12,13 +12,13 @@ The CCR proxy blocks the GitHub Actions secrets API. Use a bootstrap workflow in
 
 See CLAUDE.md § "Storing a GitHub Actions Secret from CCR" for the full workflow YAML.
 
-## Fixing GHCR Push: `permission_denied: read_package`
+## Bootstrap workflow cannot carry GitHub PATs
 
-This error means the GHCR package is not linked to the repository. `GITHUB_TOKEN` cannot push to unlinked packages.
+GitHub secret scanning on the MCP tools rejects any `ghp_…` token passed as a `workflow_dispatch` input (`Secret Scanning has rejected the input`). Do not encode/obfuscate it to evade the scanner. Avoid needing a PAT secret instead (see below).
 
-**Fix:** Use `secrets.CR_PAT` (PAT with `write:packages`) instead of `secrets.GITHUB_TOKEN` in both Login to GHCR steps in `build.yml`. CR_PAT is already stored as a repo secret.
+## GHCR login: `Password required` / `permission_denied`
 
-If CR_PAT is missing or expired, store a new one using the bootstrap workflow procedure above.
+`Password required` means the referenced secret is empty (e.g. `CR_PAT` never stored). Fix: log in with `secrets.GITHUB_TOKEN` and `permissions: packages: write`. This works because `ghcr.io/claudeailab/astraclone` is created by this repo's own workflow and is therefore linked to the repo. `permission_denied` only occurs if the package pre-exists unlinked — then link it to the repo in the package settings.
 
 ## Bumping the Version
 

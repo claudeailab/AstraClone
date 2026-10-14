@@ -4,7 +4,7 @@
 
 - `enforce-main.yml` — force-pushes any non-main branch to `main`, then triggers `build.yml` via `workflow_dispatch`
 - `build.yml` — multi-arch Docker build (amd64 + arm64), push to `ghcr.io/claudeailab/astraclone`
-- GHCR login uses `secrets.CR_PAT`, never `secrets.GITHUB_TOKEN`
+- GHCR login uses `secrets.GITHUB_TOKEN` (`packages: write`); the package is created and linked by this repo's workflow
 - Version tag format: `ghcr.io/claudeailab/astraclone:v{version}` + `:latest`
 
 ## Docker Image

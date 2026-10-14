@@ -70,4 +70,4 @@ When the proxy blocks the secrets API, use a bootstrap workflow:
 
 ## GHCR Auth
 
-`build.yml` uses `secrets.CR_PAT` (a classic PAT with `write:packages`) for both GHCR login steps — **not** `secrets.GITHUB_TOKEN`. `GITHUB_TOKEN` cannot push to packages that aren't linked to the repository. CR_PAT bypasses this restriction.
+`build.yml` uses `secrets.GITHUB_TOKEN` (with `packages: write`) for both GHCR login steps. `ghcr.io/claudeailab/astraclone` is created by this repo's own workflow, so it is linked to the repo and `GITHUB_TOKEN` can push to it — no PAT secret needed.
