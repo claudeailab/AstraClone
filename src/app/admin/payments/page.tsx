@@ -10,12 +10,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Eye, EyeOff, CheckCircle2 } from "lucide-react";
 import { pageWrapper, pageInner, pageTitle, fieldGap } from "@/lib/ui-conventions";
+import { EnvBadge } from "@/components/admin/EnvBadge";
 
-function SecretInput({ value, onChange, placeholder, isSet }: {
-  value: string; onChange: (v: string) => void; placeholder: string; isSet: boolean;
+function SecretInput({ value, onChange, placeholder, isSet, envVar }: {
+  value: string; onChange: (v: string) => void; placeholder: string; isSet: boolean; envVar?: string;
 }) {
   const [show, setShow] = useState(false);
   const configured = isSet && value === "";
+  if (envVar) return (
+    <Input type="password" value="••••••••" readOnly disabled className="bg-muted/50 text-muted-foreground cursor-not-allowed" />
+  );
   return (
     <div className="relative">
       <Input
@@ -44,6 +48,7 @@ function StripeTab() {
   const [webhookSecretSet, setWebhookSecretSet] = useState(false);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [env, setEnv] = useState<Record<string, string>>({});
   const savedRef = useRef({ enabled: true, publishableKey: "", liveMode: false });
 
   useEffect(() => {
@@ -55,6 +60,7 @@ function StripeTab() {
         setSecretKeySet(!!sks);
         setWebhookSecretSet(!!whs);
       }
+      if (d.env) setEnv(d.env);
     });
   }, []);
 
@@ -97,12 +103,24 @@ function StripeTab() {
           <CardTitle>Stripe</CardTitle>
           <div className="flex items-center gap-4 flex-wrap">
             <div className="flex items-center gap-2">
-              <Switch checked={form.liveMode} onCheckedChange={v => setForm(f => ({ ...f, liveMode: v }))} />
-              <Label className="text-sm">{form.liveMode ? "Live Mode" : "Test Mode"}</Label>
+              {env.liveMode ? (
+                <EnvBadge name={env.liveMode} />
+              ) : (
+                <>
+                  <Switch checked={form.liveMode} onCheckedChange={v => setForm(f => ({ ...f, liveMode: v }))} />
+                  <Label className="text-sm">{form.liveMode ? "Live Mode" : "Test Mode"}</Label>
+                </>
+              )}
             </div>
             <div className="flex items-center gap-2">
-              <Label className="text-sm">{form.enabled ? "Enabled" : "Disabled"}</Label>
-              <Switch checked={form.enabled} onCheckedChange={v => setForm(f => ({ ...f, enabled: v }))} />
+              {env.enabled ? (
+                <EnvBadge name={env.enabled} />
+              ) : (
+                <>
+                  <Label className="text-sm">{form.enabled ? "Enabled" : "Disabled"}</Label>
+                  <Switch checked={form.enabled} onCheckedChange={v => setForm(f => ({ ...f, enabled: v }))} />
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -110,16 +128,32 @@ function StripeTab() {
       <CardContent className="pt-6">
         <form onSubmit={handleSave} className={fieldGap}>
           <div className="flex flex-col gap-1.5">
-            <Label>Publishable Key</Label>
-            <Input value={form.publishableKey} onChange={e => setForm(f => ({ ...f, publishableKey: e.target.value }))} placeholder="pk_test_..." />
+            <div className="flex items-center gap-2">
+              <Label>Publishable Key</Label>
+              {env.publishableKey && <EnvBadge name={env.publishableKey} />}
+            </div>
+            <Input
+              value={form.publishableKey}
+              onChange={e => setForm(f => ({ ...f, publishableKey: e.target.value }))}
+              placeholder="pk_test_..."
+              readOnly={!!env.publishableKey}
+              disabled={!!env.publishableKey}
+              className={env.publishableKey ? "bg-muted/50 text-muted-foreground cursor-not-allowed" : ""}
+            />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label>Secret Key</Label>
-            <SecretInput value={form.secretKey} onChange={v => setForm(f => ({ ...f, secretKey: v }))} placeholder="sk_test_..." isSet={secretKeySet} />
+            <div className="flex items-center gap-2">
+              <Label>Secret Key</Label>
+              {env.secretKey && <EnvBadge name={env.secretKey} />}
+            </div>
+            <SecretInput value={form.secretKey} onChange={v => setForm(f => ({ ...f, secretKey: v }))} placeholder="sk_test_..." isSet={secretKeySet} envVar={env.secretKey} />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label>Webhook Secret</Label>
-            <SecretInput value={form.webhookSecret} onChange={v => setForm(f => ({ ...f, webhookSecret: v }))} placeholder="whsec_..." isSet={webhookSecretSet} />
+            <div className="flex items-center gap-2">
+              <Label>Webhook Secret</Label>
+              {env.webhookSecret && <EnvBadge name={env.webhookSecret} />}
+            </div>
+            <SecretInput value={form.webhookSecret} onChange={v => setForm(f => ({ ...f, webhookSecret: v }))} placeholder="whsec_..." isSet={webhookSecretSet} envVar={env.webhookSecret} />
           </div>
           <div className="flex flex-col sm:flex-row gap-2">
             <Button type="submit" disabled={!dirty || saving} className="w-full sm:w-auto">
@@ -140,6 +174,7 @@ function VivaWalletTab() {
   const [clientSecretSet, setClientSecretSet] = useState(false);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [env, setEnv] = useState<Record<string, string>>({});
   const savedRef = useRef({ enabled: false, clientId: "", merchantId: "", liveMode: false });
 
   useEffect(() => {
@@ -150,6 +185,7 @@ function VivaWalletTab() {
         setForm(f => ({ ...f, enabled: enabled ?? false, liveMode: liveMode ?? false, clientId: clientId ?? "", merchantId: merchantId ?? "" }));
         setClientSecretSet(!!css);
       }
+      if (d.env) setEnv(d.env);
     });
   }, []);
 
@@ -191,12 +227,24 @@ function VivaWalletTab() {
           <CardTitle>Viva</CardTitle>
           <div className="flex items-center gap-4 flex-wrap">
             <div className="flex items-center gap-2">
-              <Switch checked={form.liveMode} onCheckedChange={v => setForm(f => ({ ...f, liveMode: v }))} />
-              <Label className="text-sm">{form.liveMode ? "Production" : "Demo Mode"}</Label>
+              {env.liveMode ? (
+                <EnvBadge name={env.liveMode} />
+              ) : (
+                <>
+                  <Switch checked={form.liveMode} onCheckedChange={v => setForm(f => ({ ...f, liveMode: v }))} />
+                  <Label className="text-sm">{form.liveMode ? "Production" : "Demo Mode"}</Label>
+                </>
+              )}
             </div>
             <div className="flex items-center gap-2">
-              <Label className="text-sm">{form.enabled ? "Enabled" : "Disabled"}</Label>
-              <Switch checked={form.enabled} onCheckedChange={v => setForm(f => ({ ...f, enabled: v }))} />
+              {env.enabled ? (
+                <EnvBadge name={env.enabled} />
+              ) : (
+                <>
+                  <Label className="text-sm">{form.enabled ? "Enabled" : "Disabled"}</Label>
+                  <Switch checked={form.enabled} onCheckedChange={v => setForm(f => ({ ...f, enabled: v }))} />
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -204,16 +252,39 @@ function VivaWalletTab() {
       <CardContent className="pt-6">
         <form onSubmit={handleSave} className={fieldGap}>
           <div className="flex flex-col gap-1.5">
-            <Label>Client ID</Label>
-            <Input value={form.clientId} onChange={e => setForm(f => ({ ...f, clientId: e.target.value }))} placeholder="Client ID from Viva Wallet dashboard" />
+            <div className="flex items-center gap-2">
+              <Label>Client ID</Label>
+              {env.clientId && <EnvBadge name={env.clientId} />}
+            </div>
+            <Input
+              value={form.clientId}
+              onChange={e => setForm(f => ({ ...f, clientId: e.target.value }))}
+              placeholder="Client ID from Viva Wallet dashboard"
+              readOnly={!!env.clientId}
+              disabled={!!env.clientId}
+              className={env.clientId ? "bg-muted/50 text-muted-foreground cursor-not-allowed" : ""}
+            />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label>Client Secret</Label>
-            <SecretInput value={form.clientSecret} onChange={v => setForm(f => ({ ...f, clientSecret: v }))} placeholder="Client Secret" isSet={clientSecretSet} />
+            <div className="flex items-center gap-2">
+              <Label>Client Secret</Label>
+              {env.clientSecret && <EnvBadge name={env.clientSecret} />}
+            </div>
+            <SecretInput value={form.clientSecret} onChange={v => setForm(f => ({ ...f, clientSecret: v }))} placeholder="Client Secret" isSet={clientSecretSet} envVar={env.clientSecret} />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label>Merchant ID <span className="text-muted-foreground font-normal">(optional)</span></Label>
-            <Input value={form.merchantId} onChange={e => setForm(f => ({ ...f, merchantId: e.target.value }))} placeholder="Merchant ID" />
+            <div className="flex items-center gap-2">
+              <Label>Merchant ID <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              {env.merchantId && <EnvBadge name={env.merchantId} />}
+            </div>
+            <Input
+              value={form.merchantId}
+              onChange={e => setForm(f => ({ ...f, merchantId: e.target.value }))}
+              placeholder="Merchant ID"
+              readOnly={!!env.merchantId}
+              disabled={!!env.merchantId}
+              className={env.merchantId ? "bg-muted/50 text-muted-foreground cursor-not-allowed" : ""}
+            />
           </div>
           <div className="flex flex-col sm:flex-row gap-2">
             <Button type="submit" disabled={!dirty || saving} className="w-full sm:w-auto">
@@ -234,6 +305,7 @@ function PayPalTab() {
   const [clientSecretSet, setClientSecretSet] = useState(false);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [env, setEnv] = useState<Record<string, string>>({});
   const savedRef = useRef({ enabled: false, clientId: "", liveMode: false });
 
   useEffect(() => {
@@ -244,6 +316,7 @@ function PayPalTab() {
         setForm(f => ({ ...f, enabled: enabled ?? false, liveMode: liveMode ?? false, clientId: clientId ?? "" }));
         setClientSecretSet(!!css);
       }
+      if (d.env) setEnv(d.env);
     });
   }, []);
 
@@ -284,12 +357,24 @@ function PayPalTab() {
           <CardTitle>PayPal</CardTitle>
           <div className="flex items-center gap-4 flex-wrap">
             <div className="flex items-center gap-2">
-              <Switch checked={form.liveMode} onCheckedChange={v => setForm(f => ({ ...f, liveMode: v }))} />
-              <Label className="text-sm">{form.liveMode ? "Live" : "Sandbox"}</Label>
+              {env.liveMode ? (
+                <EnvBadge name={env.liveMode} />
+              ) : (
+                <>
+                  <Switch checked={form.liveMode} onCheckedChange={v => setForm(f => ({ ...f, liveMode: v }))} />
+                  <Label className="text-sm">{form.liveMode ? "Live" : "Sandbox"}</Label>
+                </>
+              )}
             </div>
             <div className="flex items-center gap-2">
-              <Label className="text-sm">{form.enabled ? "Enabled" : "Disabled"}</Label>
-              <Switch checked={form.enabled} onCheckedChange={v => setForm(f => ({ ...f, enabled: v }))} />
+              {env.enabled ? (
+                <EnvBadge name={env.enabled} />
+              ) : (
+                <>
+                  <Label className="text-sm">{form.enabled ? "Enabled" : "Disabled"}</Label>
+                  <Switch checked={form.enabled} onCheckedChange={v => setForm(f => ({ ...f, enabled: v }))} />
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -297,12 +382,25 @@ function PayPalTab() {
       <CardContent className="pt-6">
         <form onSubmit={handleSave} className={fieldGap}>
           <div className="flex flex-col gap-1.5">
-            <Label>Client ID</Label>
-            <Input value={form.clientId} onChange={e => setForm(f => ({ ...f, clientId: e.target.value }))} placeholder="Client ID from PayPal Developer Dashboard" />
+            <div className="flex items-center gap-2">
+              <Label>Client ID</Label>
+              {env.clientId && <EnvBadge name={env.clientId} />}
+            </div>
+            <Input
+              value={form.clientId}
+              onChange={e => setForm(f => ({ ...f, clientId: e.target.value }))}
+              placeholder="Client ID from PayPal Developer Dashboard"
+              readOnly={!!env.clientId}
+              disabled={!!env.clientId}
+              className={env.clientId ? "bg-muted/50 text-muted-foreground cursor-not-allowed" : ""}
+            />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label>Client Secret</Label>
-            <SecretInput value={form.clientSecret} onChange={v => setForm(f => ({ ...f, clientSecret: v }))} placeholder="Client Secret" isSet={clientSecretSet} />
+            <div className="flex items-center gap-2">
+              <Label>Client Secret</Label>
+              {env.clientSecret && <EnvBadge name={env.clientSecret} />}
+            </div>
+            <SecretInput value={form.clientSecret} onChange={v => setForm(f => ({ ...f, clientSecret: v }))} placeholder="Client Secret" isSet={clientSecretSet} envVar={env.clientSecret} />
           </div>
           <div className="flex flex-col sm:flex-row gap-2">
             <Button type="submit" disabled={!dirty || saving} className="w-full sm:w-auto">

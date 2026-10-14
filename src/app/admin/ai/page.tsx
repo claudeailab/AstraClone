@@ -11,12 +11,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Eye, EyeOff, CheckCircle2 } from "lucide-react";
 import { pageWrapper, pageInner, pageTitle, fieldGap } from "@/lib/ui-conventions";
+import { EnvBadge } from "@/components/admin/EnvBadge";
 
-function SecretInput({ value, onChange, placeholder, isSet }: {
-  value: string; onChange: (v: string) => void; placeholder: string; isSet: boolean;
+function SecretInput({ value, onChange, placeholder, isSet, envVar }: {
+  value: string; onChange: (v: string) => void; placeholder: string; isSet: boolean; envVar?: string;
 }) {
   const [show, setShow] = useState(false);
   const configured = isSet && value === "";
+  if (envVar) return (
+    <div className="relative">
+      <Input type="password" value="••••••••" readOnly disabled className="bg-muted/50 text-muted-foreground cursor-not-allowed" />
+    </div>
+  );
   return (
     <div className="relative">
       <Input
@@ -56,6 +62,7 @@ export default function AIPage() {
   const [savingOpenai, setSavingOpenai] = useState(false);
   const [testingAnthropic, setTestingAnthropic] = useState(false);
   const [testingOpenai, setTestingOpenai] = useState(false);
+  const [env, setEnv] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetch("/api/admin/settings/ai").then(r => r.json()).then(d => {
@@ -67,6 +74,7 @@ export default function AIPage() {
       const oe = d.openaiEnabled !== false;
       setAnthropicEnabled(ae); setSavedAnthropicEnabled(ae);
       setOpenaiEnabled(oe); setSavedOpenaiEnabled(oe);
+      if (d.env) setEnv(d.env);
     });
   }, []);
 
@@ -136,26 +144,42 @@ export default function AIPage() {
                 <div className="flex items-center justify-between">
                   <CardTitle>Anthropic</CardTitle>
                   <div className="flex items-center gap-2 shrink-0">
-                    <Label className="text-sm">{anthropicEnabled ? "Enabled" : "Disabled"}</Label>
-                    <Switch checked={anthropicEnabled} onCheckedChange={setAnthropicEnabled} />
+                    {env.anthropicEnabled ? (
+                      <EnvBadge name={env.anthropicEnabled} />
+                    ) : (
+                      <>
+                        <Label className="text-sm">{anthropicEnabled ? "Enabled" : "Disabled"}</Label>
+                        <Switch checked={anthropicEnabled} onCheckedChange={setAnthropicEnabled} />
+                      </>
+                    )}
                   </div>
                 </div>
               </CardHeader>
               <CardContent className={`pt-6 ${fieldGap}`}>
                 <div className="flex flex-col gap-1.5">
-                  <Label>API Key</Label>
-                  <SecretInput value={anthropicKey} onChange={setAnthropicKey} placeholder="sk-ant-..." isSet={anthropicKeySet} />
+                  <div className="flex items-center gap-2">
+                    <Label>API Key</Label>
+                    {env.anthropicApiKey && <EnvBadge name={env.anthropicApiKey} />}
+                  </div>
+                  <SecretInput value={anthropicKey} onChange={setAnthropicKey} placeholder="sk-ant-..." isSet={anthropicKeySet} envVar={env.anthropicApiKey} />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <Label>Model</Label>
-                  <Select value={anthropicModel} onValueChange={setAnthropicModel}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="claude-sonnet-4-6">claude-sonnet-4-6</SelectItem>
-                      <SelectItem value="claude-opus-5">claude-opus-5</SelectItem>
-                      <SelectItem value="claude-haiku-4-5-20251001">claude-haiku-4-5</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center gap-2">
+                    <Label>Model</Label>
+                    {env.anthropicModel && <EnvBadge name={env.anthropicModel} />}
+                  </div>
+                  {env.anthropicModel ? (
+                    <Input value={anthropicModel} readOnly disabled className="bg-muted/50 text-muted-foreground cursor-not-allowed" />
+                  ) : (
+                    <Select value={anthropicModel} onValueChange={setAnthropicModel}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="claude-sonnet-4-6">claude-sonnet-4-6</SelectItem>
+                        <SelectItem value="claude-opus-5">claude-opus-5</SelectItem>
+                        <SelectItem value="claude-haiku-4-5-20251001">claude-haiku-4-5</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <Button onClick={saveAnthropic} disabled={!dirtyAnthropic || savingAnthropic} className="w-full sm:w-auto">
@@ -174,26 +198,42 @@ export default function AIPage() {
                 <div className="flex items-center justify-between">
                   <CardTitle>OpenAI</CardTitle>
                   <div className="flex items-center gap-2 shrink-0">
-                    <Label className="text-sm">{openaiEnabled ? "Enabled" : "Disabled"}</Label>
-                    <Switch checked={openaiEnabled} onCheckedChange={setOpenaiEnabled} />
+                    {env.openaiEnabled ? (
+                      <EnvBadge name={env.openaiEnabled} />
+                    ) : (
+                      <>
+                        <Label className="text-sm">{openaiEnabled ? "Enabled" : "Disabled"}</Label>
+                        <Switch checked={openaiEnabled} onCheckedChange={setOpenaiEnabled} />
+                      </>
+                    )}
                   </div>
                 </div>
               </CardHeader>
               <CardContent className={`pt-6 ${fieldGap}`}>
                 <div className="flex flex-col gap-1.5">
-                  <Label>API Key</Label>
-                  <SecretInput value={openaiKey} onChange={setOpenaiKey} placeholder="sk-..." isSet={openaiKeySet} />
+                  <div className="flex items-center gap-2">
+                    <Label>API Key</Label>
+                    {env.openaiApiKey && <EnvBadge name={env.openaiApiKey} />}
+                  </div>
+                  <SecretInput value={openaiKey} onChange={setOpenaiKey} placeholder="sk-..." isSet={openaiKeySet} envVar={env.openaiApiKey} />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <Label>Model</Label>
-                  <Select value={openaiModel} onValueChange={setOpenaiModel}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="gpt-4o">gpt-4o</SelectItem>
-                      <SelectItem value="gpt-4o-mini">gpt-4o-mini</SelectItem>
-                      <SelectItem value="o3">o3</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center gap-2">
+                    <Label>Model</Label>
+                    {env.openaiModel && <EnvBadge name={env.openaiModel} />}
+                  </div>
+                  {env.openaiModel ? (
+                    <Input value={openaiModel} readOnly disabled className="bg-muted/50 text-muted-foreground cursor-not-allowed" />
+                  ) : (
+                    <Select value={openaiModel} onValueChange={setOpenaiModel}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="gpt-4o">gpt-4o</SelectItem>
+                        <SelectItem value="gpt-4o-mini">gpt-4o-mini</SelectItem>
+                        <SelectItem value="o3">o3</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <Button onClick={saveOpenai} disabled={!dirtyOpenai || savingOpenai} className="w-full sm:w-auto">

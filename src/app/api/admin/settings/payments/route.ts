@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
-import { getSetting, setSetting } from "@/lib/encryption";
+import { getSetting, setSetting, getEnvOverride, getEnvVarName } from "@/lib/encryption";
 import { logAudit } from "@/lib/audit";
 
 const schema = z.object({
@@ -21,13 +21,20 @@ export async function GET() {
     getSetting("stripe_secretKey"),
     getSetting("stripe_webhookSecret"),
   ]);
+  const envLocked = (k: string) => { const v = getEnvOverride(k); return v !== undefined && v !== ""; };
+  const env: Record<string, string> = {};
+  const stripeKeys: [string, string][] = [
+    ["stripe_enabled","enabled"],["stripe_liveMode","liveMode"],["stripe_publishableKey","publishableKey"],
+    ["stripe_secretKey","secretKey"],["stripe_webhookSecret","webhookSecret"],
+  ];
+  for (const [k, f] of stripeKeys) if (envLocked(k)) env[f] = getEnvVarName(k)!;
   return NextResponse.json({ data: {
     enabled: enabled !== "false",
     liveMode: liveMode === "true",
     publishableKey: publishableKey ?? "",
     secretKeySet: !!secretKey,
     webhookSecretSet: !!webhookSecret,
-  }});
+  }, env });
 }
 
 export async function POST(req: NextRequest) {

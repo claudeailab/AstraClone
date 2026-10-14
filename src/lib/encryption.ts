@@ -55,6 +55,48 @@ export function getEnvOverride(key: string): string | undefined {
   }
 }
 
+export function getEnvVarName(key: string): string | undefined {
+  switch (key) {
+    case "anthropic_enabled":       return "WEBAPP_ANTHROPIC_ENABLED";
+    case "anthropic_apiKey":        return "WEBAPP_ANTHROPIC_API_KEY";
+    case "anthropic_model":         return "WEBAPP_ANTHROPIC_MODEL";
+    case "openai_enabled":          return "WEBAPP_OPENAI_ENABLED";
+    case "openai_apiKey":           return "WEBAPP_OPENAI_API_KEY";
+    case "openai_model":            return "WEBAPP_OPENAI_MODEL";
+    case "smtp_enabled":            return "WEBAPP_SMTP_ENABLED";
+    case "smtp_host":               return "WEBAPP_SMTP_HOST";
+    case "smtp_port":               return "WEBAPP_SMTP_PORT";
+    case "smtp_ssl":                return "WEBAPP_SMTP_SSL";
+    case "smtp_user":               return "WEBAPP_SMTP_USER";
+    case "smtp_password":           return "WEBAPP_SMTP_PASSWORD";
+    case "smtp_fromName":           return "WEBAPP_SMTP_FROM_NAME";
+    case "smtp_fromEmail":          return "WEBAPP_SMTP_FROM_EMAIL";
+    case "m365_enabled":            return "WEBAPP_M365_ENABLED";
+    case "m365_clientId":           return "WEBAPP_M365_CLIENT_ID";
+    case "m365_clientSecret":       return "WEBAPP_M365_CLIENT_SECRET";
+    case "m365_tenantId":           return "WEBAPP_M365_TENANT_ID";
+    case "m365_expiryDate":         return "WEBAPP_M365_EXPIRY_DATE";
+    case "m365_reminderDays":       return "WEBAPP_M365_REMINDER_DAYS";
+    case "m365_reminderEmail":      return "WEBAPP_M365_REMINDER_EMAIL";
+    case "stripe_enabled":          return "WEBAPP_STRIPE_ENABLED";
+    case "stripe_liveMode":         return "WEBAPP_STRIPE_LIVE_MODE";
+    case "stripe_publishableKey":   return "WEBAPP_STRIPE_PUBLISHABLE_KEY";
+    case "stripe_secretKey":        return "WEBAPP_STRIPE_SECRET_KEY";
+    case "stripe_webhookSecret":    return "WEBAPP_STRIPE_WEBHOOK_SECRET";
+    case "paypal_enabled":          return "WEBAPP_PAYPAL_ENABLED";
+    case "paypal_liveMode":         return "WEBAPP_PAYPAL_LIVE_MODE";
+    case "paypal_clientId":         return "WEBAPP_PAYPAL_CLIENT_ID";
+    case "paypal_clientSecret":     return "WEBAPP_PAYPAL_CLIENT_SECRET";
+    case "vivawallet_enabled":      return "WEBAPP_VIVA_ENABLED";
+    case "vivawallet_liveMode":     return "WEBAPP_VIVA_LIVE_MODE";
+    case "vivawallet_clientId":     return "WEBAPP_VIVA_CLIENT_ID";
+    case "vivawallet_clientSecret": return "WEBAPP_VIVA_CLIENT_SECRET";
+    case "vivawallet_merchantId":   return "WEBAPP_VIVA_MERCHANT_ID";
+    case "platform_timezone":       return "TZ";
+    default:                        return undefined;
+  }
+}
+
 // Keys that can be overridden via env vars (for UI "locked" state detection)
 export const ENV_SETTING_KEYS = new Set([
   "anthropic_enabled","anthropic_apiKey","anthropic_model",

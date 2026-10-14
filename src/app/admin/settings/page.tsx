@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Switch } from "@/components/ui/switch";
 import { Loader2, Plus, Pencil, Trash2, CheckCircle2, Search } from "lucide-react";
 import { pageWrapper, pageInner, pageTitle } from "@/lib/ui-conventions";
+import { EnvBadge } from "@/components/admin/EnvBadge";
 import { PLATFORM_PERMISSIONS } from "@/lib/permissions";
 import type { FeatureKey } from "@/lib/features";
 import { iconUrl, DEFAULT_ICON, DEFAULT_PRIMARY_COLOR } from "@/lib/platform-shared";
@@ -107,9 +108,7 @@ function DateTimeTab() {
       <div className="space-y-3">
         <div className="flex items-center gap-2">
           <Label>Timezone</Label>
-          {tzFromEnv && (
-            <span className="text-[10px] font-semibold bg-primary/10 text-primary px-1.5 py-0.5 rounded">ENV</span>
-          )}
+          {tzFromEnv && <EnvBadge name="TZ" />}
         </div>
         <Input
           list="tz-list"

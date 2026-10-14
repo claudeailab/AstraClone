@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
-import { getSetting, setSetting } from "@/lib/encryption";
+import { getSetting, setSetting, getEnvOverride, getEnvVarName } from "@/lib/encryption";
 import { logAudit } from "@/lib/audit";
 
 const schema = z.object({
@@ -21,6 +21,13 @@ export async function GET() {
     getSetting("anthropic_enabled"),
     getSetting("openai_enabled"),
   ]);
+  const envLocked = (k: string) => { const v = getEnvOverride(k); return v !== undefined && v !== ""; };
+  const env: Record<string, string> = {};
+  const aiKeys: [string, string][] = [
+    ["anthropic_enabled","anthropicEnabled"],["anthropic_apiKey","anthropicApiKey"],["anthropic_model","anthropicModel"],
+    ["openai_enabled","openaiEnabled"],["openai_apiKey","openaiApiKey"],["openai_model","openaiModel"],
+  ];
+  for (const [k, f] of aiKeys) if (envLocked(k)) env[f] = getEnvVarName(k)!;
   return NextResponse.json({
     anthropicModel: anthropicModel ?? "claude-sonnet-4-6",
     openaiModel: openaiModel ?? "gpt-4o",
@@ -28,6 +35,7 @@ export async function GET() {
     openaiKeySet: !!openaiKey,
     anthropicEnabled: anthropicEnabled !== "false",
     openaiEnabled: openaiEnabled !== "false",
+    env,
   });
 }
 

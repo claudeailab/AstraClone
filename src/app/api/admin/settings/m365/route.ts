@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
-import { getSetting, setSetting } from "@/lib/encryption";
+import { getSetting, setSetting, getEnvOverride, getEnvVarName } from "@/lib/encryption";
 import { logAudit } from "@/lib/audit";
 
 const schema = z.object({
@@ -25,7 +25,14 @@ export async function GET() {
     getSetting("m365_reminderEmail"),
     getSetting("m365_clientSecret"),
   ]);
-  return NextResponse.json({ data: { enabled: enabled !== "false", clientId: clientId ?? "", tenantId: tenantId ?? "", expiryDate: expiryDate ?? "", reminderDays: reminderDays ?? "30", reminderEmail: reminderEmail ?? "", clientSecretSet: !!clientSecret } });
+  const envLocked = (k: string) => { const v = getEnvOverride(k); return v !== undefined && v !== ""; };
+  const env: Record<string, string> = {};
+  const m365Keys: [string, string][] = [
+    ["m365_enabled","enabled"],["m365_clientId","clientId"],["m365_clientSecret","clientSecret"],
+    ["m365_tenantId","tenantId"],["m365_expiryDate","expiryDate"],["m365_reminderDays","reminderDays"],["m365_reminderEmail","reminderEmail"],
+  ];
+  for (const [k, f] of m365Keys) if (envLocked(k)) env[f] = getEnvVarName(k)!;
+  return NextResponse.json({ data: { enabled: enabled !== "false", clientId: clientId ?? "", tenantId: tenantId ?? "", expiryDate: expiryDate ?? "", reminderDays: reminderDays ?? "30", reminderEmail: reminderEmail ?? "", clientSecretSet: !!clientSecret }, env });
 }
 
 export async function POST(req: NextRequest) {

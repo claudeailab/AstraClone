@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
-import { getSetting, setSetting } from "@/lib/encryption";
+import { getSetting, setSetting, getEnvOverride, getEnvVarName } from "@/lib/encryption";
 import { logAudit } from "@/lib/audit";
 
 const schema = z.object({
@@ -27,7 +27,14 @@ export async function GET() {
     getSetting("smtp_user"),
     getSetting("smtp_password"),
   ]);
-  return NextResponse.json({ data: { enabled: enabled !== "false", host: host ?? "", port: port ?? "587", ssl: ssl === "true", user: user ?? "", fromName: fromName ?? "", fromEmail: fromEmail ?? "", passwordSet: !!password } });
+  const envLocked = (k: string) => { const v = getEnvOverride(k); return v !== undefined && v !== ""; };
+  const env: Record<string, string> = {};
+  const smtpKeys: [string, string][] = [
+    ["smtp_enabled","enabled"],["smtp_host","host"],["smtp_port","port"],["smtp_ssl","ssl"],
+    ["smtp_user","user"],["smtp_password","password"],["smtp_fromName","fromName"],["smtp_fromEmail","fromEmail"],
+  ];
+  for (const [k, f] of smtpKeys) if (envLocked(k)) env[f] = getEnvVarName(k)!;
+  return NextResponse.json({ data: { enabled: enabled !== "false", host: host ?? "", port: port ?? "587", ssl: ssl === "true", user: user ?? "", fromName: fromName ?? "", fromEmail: fromEmail ?? "", passwordSet: !!password }, env });
 }
 
 export async function POST(req: NextRequest) {

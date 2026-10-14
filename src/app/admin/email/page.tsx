@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Eye, EyeOff, CheckCircle2 } from "lucide-react";
 import { pageWrapper, pageInner, pageTitle, fieldGap } from "@/lib/ui-conventions";
+import { EnvBadge } from "@/components/admin/EnvBadge";
 
 type FormState = { enabled: boolean; host: string; port: string; ssl: boolean; user: string; password: string; fromName: string; fromEmail: string };
 const defaultForm: FormState = { enabled: true, host: "", port: "587", ssl: false, user: "", password: "", fromName: "", fromEmail: "" };
@@ -19,6 +20,7 @@ export default function EmailPage() {
   const [showPass, setShowPass] = useState(false);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [env, setEnv] = useState<Record<string, string>>({});
   const savedForm = useRef<FormState>(defaultForm);
 
   useEffect(() => {
@@ -30,11 +32,13 @@ export default function EmailPage() {
         setForm(loaded);
         setPasswordSet(!!ps);
       }
+      if (d.env) setEnv(d.env);
     });
   }, []);
 
   const dirty = JSON.stringify(form) !== JSON.stringify(savedForm.current);
   const passConfigured = passwordSet && form.password === "";
+  const passEnvLocked = !!env.password;
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -59,6 +63,11 @@ export default function EmailPage() {
     } finally { setTesting(false); }
   }
 
+  function lockedInput(field: keyof FormState, props: React.ComponentProps<typeof Input>) {
+    const locked = !!env[field];
+    return <Input {...props} readOnly={locked} disabled={locked} className={locked ? "bg-muted/50 text-muted-foreground cursor-not-allowed" : props.className} />;
+  }
+
   return (
     <div className={pageWrapper}>
       <div className={pageInner}>
@@ -68,8 +77,14 @@ export default function EmailPage() {
             <div className="flex items-center justify-between">
               <CardTitle>SMTP Configuration</CardTitle>
               <div className="flex items-center gap-2 shrink-0">
-                <Label className="text-sm">{form.enabled ? "Enabled" : "Disabled"}</Label>
-                <Switch checked={form.enabled} onCheckedChange={v => setForm(f => ({ ...f, enabled: v }))} />
+                {env.enabled ? (
+                  <EnvBadge name={env.enabled} />
+                ) : (
+                  <>
+                    <Label className="text-sm">{form.enabled ? "Enabled" : "Disabled"}</Label>
+                    <Switch checked={form.enabled} onCheckedChange={v => setForm(f => ({ ...f, enabled: v }))} />
+                  </>
+                )}
               </div>
             </div>
           </CardHeader>
@@ -77,53 +92,76 @@ export default function EmailPage() {
             <form onSubmit={handleSave} className={fieldGap}>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="flex flex-col gap-1.5">
-                  <Label>SMTP Host</Label>
-                  <Input value={form.host} onChange={e => setForm(f => ({ ...f, host: e.target.value }))} placeholder="smtp.example.com" />
+                  <div className="flex items-center gap-2">
+                    <Label>SMTP Host</Label>
+                    {env.host && <EnvBadge name={env.host} />}
+                  </div>
+                  {lockedInput("host", { value: form.host, onChange: e => setForm(f => ({ ...f, host: e.target.value })), placeholder: "smtp.example.com" })}
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <Label>Port</Label>
-                  <Input type="number" value={form.port} onChange={e => setForm(f => ({ ...f, port: e.target.value }))} />
+                  <div className="flex items-center gap-2">
+                    <Label>Port</Label>
+                    {env.port && <EnvBadge name={env.port} />}
+                  </div>
+                  {lockedInput("port", { type: "number", value: form.port, onChange: e => setForm(f => ({ ...f, port: e.target.value })) })}
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Switch checked={form.ssl} onCheckedChange={v => setForm(f => ({ ...f, ssl: v }))} />
+                <Switch checked={form.ssl} onCheckedChange={v => setForm(f => ({ ...f, ssl: v }))} disabled={!!env.ssl} />
                 <Label>SSL/TLS</Label>
+                {env.ssl && <EnvBadge name={env.ssl} />}
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="flex flex-col gap-1.5">
-                  <Label>Username</Label>
-                  <Input value={form.user} onChange={e => setForm(f => ({ ...f, user: e.target.value }))} />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label>Password</Label>
-                  <div className="relative">
-                    <Input
-                      type={showPass ? "text" : "password"}
-                      value={form.password}
-                      onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-                      placeholder={passConfigured ? "••••••••" : undefined}
-                      className={passConfigured ? "pr-28 ring-1 ring-emerald-500 border-emerald-500 focus-visible:ring-emerald-500" : "pr-10"}
-                    />
-                    {passConfigured ? (
-                      <span className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/60 rounded-full px-2 py-0.5 pointer-events-none select-none">
-                        <CheckCircle2 className="h-3 w-3 shrink-0" /> Configured
-                      </span>
-                    ) : (
-                      <button type="button" className="absolute right-3 top-3 text-muted-foreground" onClick={() => setShowPass(v => !v)}>
-                        {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    )}
+                  <div className="flex items-center gap-2">
+                    <Label>Username</Label>
+                    {env.user && <EnvBadge name={env.user} />}
                   </div>
+                  {lockedInput("user", { value: form.user, onChange: e => setForm(f => ({ ...f, user: e.target.value })) })}
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center gap-2">
+                    <Label>Password</Label>
+                    {env.password && <EnvBadge name={env.password} />}
+                  </div>
+                  {passEnvLocked ? (
+                    <Input readOnly disabled value="••••••••" className="bg-muted/50 text-muted-foreground cursor-not-allowed" />
+                  ) : (
+                    <div className="relative">
+                      <Input
+                        type={showPass ? "text" : "password"}
+                        value={form.password}
+                        onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                        placeholder={passConfigured ? "••••••••" : undefined}
+                        className={passConfigured ? "pr-28 ring-1 ring-emerald-500 border-emerald-500 focus-visible:ring-emerald-500" : "pr-10"}
+                      />
+                      {passConfigured ? (
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/60 rounded-full px-2 py-0.5 pointer-events-none select-none">
+                          <CheckCircle2 className="h-3 w-3 shrink-0" /> Configured
+                        </span>
+                      ) : (
+                        <button type="button" className="absolute right-3 top-3 text-muted-foreground" onClick={() => setShowPass(v => !v)}>
+                          {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="flex flex-col gap-1.5">
-                  <Label>From Name</Label>
-                  <Input value={form.fromName} onChange={e => setForm(f => ({ ...f, fromName: e.target.value }))} />
+                  <div className="flex items-center gap-2">
+                    <Label>From Name</Label>
+                    {env.fromName && <EnvBadge name={env.fromName} />}
+                  </div>
+                  {lockedInput("fromName", { value: form.fromName, onChange: e => setForm(f => ({ ...f, fromName: e.target.value })) })}
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <Label>From Email</Label>
-                  <Input type="email" value={form.fromEmail} onChange={e => setForm(f => ({ ...f, fromEmail: e.target.value }))} />
+                  <div className="flex items-center gap-2">
+                    <Label>From Email</Label>
+                    {env.fromEmail && <EnvBadge name={env.fromEmail} />}
+                  </div>
+                  {lockedInput("fromEmail", { type: "email", value: form.fromEmail, onChange: e => setForm(f => ({ ...f, fromEmail: e.target.value })) })}
                 </div>
               </div>
               <div className="flex flex-col sm:flex-row gap-2">

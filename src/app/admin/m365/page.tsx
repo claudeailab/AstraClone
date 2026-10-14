@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Loader2, Eye, EyeOff, Copy, ExternalLink, CheckCircle2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { pageWrapper, pageInner, pageTitle, fieldGap } from "@/lib/ui-conventions";
+import { EnvBadge } from "@/components/admin/EnvBadge";
 
 type FormState = { enabled: boolean; clientId: string; clientSecret: string; tenantId: string; expiryDate: string; reminderDays: string; reminderEmail: string };
 const defaultForm: FormState = { enabled: true, clientId: "", clientSecret: "", tenantId: "", expiryDate: "", reminderDays: "30", reminderEmail: "" };
@@ -20,6 +21,7 @@ export default function M365Page() {
   const [showSecret, setShowSecret] = useState(false);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [env, setEnv] = useState<Record<string, string>>({});
   const savedForm = useRef<FormState>(defaultForm);
 
   useEffect(() => {
@@ -31,11 +33,13 @@ export default function M365Page() {
         setForm(loaded);
         setClientSecretSet(!!css);
       }
+      if (d.env) setEnv(d.env);
     });
   }, []);
 
   const dirty = JSON.stringify(form) !== JSON.stringify(savedForm.current);
   const secretConfigured = clientSecretSet && form.clientSecret === "";
+  const secretEnvLocked = !!env.clientSecret;
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -58,6 +62,11 @@ export default function M365Page() {
       if (!r.ok) { toast.error(d.error ?? "Test failed"); return; }
       toast.success("M365 connection successful");
     } finally { setTesting(false); }
+  }
+
+  function lockedInput(field: keyof FormState, props: React.ComponentProps<typeof Input>) {
+    const locked = !!env[field];
+    return <Input {...props} readOnly={locked} disabled={locked} className={locked ? "bg-muted/50 text-muted-foreground cursor-not-allowed" : props.className} />;
   }
 
   return (
@@ -145,55 +154,83 @@ export default function M365Page() {
             <div className="flex items-center justify-between">
               <CardTitle>Azure AD</CardTitle>
               <div className="flex items-center gap-2 shrink-0">
-                <Label className="text-sm">{form.enabled ? "Enabled" : "Disabled"}</Label>
-                <Switch checked={form.enabled} onCheckedChange={v => setForm(f => ({ ...f, enabled: v }))} />
+                {env.enabled ? (
+                  <EnvBadge name={env.enabled} />
+                ) : (
+                  <>
+                    <Label className="text-sm">{form.enabled ? "Enabled" : "Disabled"}</Label>
+                    <Switch checked={form.enabled} onCheckedChange={v => setForm(f => ({ ...f, enabled: v }))} />
+                  </>
+                )}
               </div>
             </div>
           </CardHeader>
           <CardContent className="pt-6">
             <form onSubmit={handleSave} className={fieldGap}>
               <div className="flex flex-col gap-1.5">
-                <Label>Client ID</Label>
-                <Input value={form.clientId} onChange={e => setForm(f => ({ ...f, clientId: e.target.value }))} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label>Client Secret</Label>
-                <div className="relative">
-                  <Input
-                    type={showSecret ? "text" : "password"}
-                    value={form.clientSecret}
-                    onChange={e => setForm(f => ({ ...f, clientSecret: e.target.value }))}
-                    placeholder={secretConfigured ? "••••••••" : undefined}
-                    className={secretConfigured ? "pr-28 ring-1 ring-emerald-500 border-emerald-500 focus-visible:ring-emerald-500" : "pr-10"}
-                  />
-                  {secretConfigured ? (
-                    <span className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/60 rounded-full px-2 py-0.5 pointer-events-none select-none">
-                      <CheckCircle2 className="h-3 w-3 shrink-0" /> Configured
-                    </span>
-                  ) : (
-                    <button type="button" className="absolute right-3 top-3 text-muted-foreground" onClick={() => setShowSecret(v => !v)}>
-                      {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  )}
+                <div className="flex items-center gap-2">
+                  <Label>Client ID</Label>
+                  {env.clientId && <EnvBadge name={env.clientId} />}
                 </div>
+                {lockedInput("clientId", { value: form.clientId, onChange: e => setForm(f => ({ ...f, clientId: e.target.value })), placeholder: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" })}
               </div>
               <div className="flex flex-col gap-1.5">
-                <Label>Tenant ID</Label>
-                <Input value={form.tenantId} onChange={e => setForm(f => ({ ...f, tenantId: e.target.value }))} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+                <div className="flex items-center gap-2">
+                  <Label>Client Secret</Label>
+                  {env.clientSecret && <EnvBadge name={env.clientSecret} />}
+                </div>
+                {secretEnvLocked ? (
+                  <Input type="password" readOnly disabled value="••••••••" className="bg-muted/50 text-muted-foreground cursor-not-allowed" />
+                ) : (
+                  <div className="relative">
+                    <Input
+                      type={showSecret ? "text" : "password"}
+                      value={form.clientSecret}
+                      onChange={e => setForm(f => ({ ...f, clientSecret: e.target.value }))}
+                      placeholder={secretConfigured ? "••••••••" : undefined}
+                      className={secretConfigured ? "pr-28 ring-1 ring-emerald-500 border-emerald-500 focus-visible:ring-emerald-500" : "pr-10"}
+                    />
+                    {secretConfigured ? (
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/60 rounded-full px-2 py-0.5 pointer-events-none select-none">
+                        <CheckCircle2 className="h-3 w-3 shrink-0" /> Configured
+                      </span>
+                    ) : (
+                      <button type="button" className="absolute right-3 top-3 text-muted-foreground" onClick={() => setShowSecret(v => !v)}>
+                        {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-2">
+                  <Label>Tenant ID</Label>
+                  {env.tenantId && <EnvBadge name={env.tenantId} />}
+                </div>
+                {lockedInput("tenantId", { value: form.tenantId, onChange: e => setForm(f => ({ ...f, tenantId: e.target.value })), placeholder: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" })}
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="flex flex-col gap-1.5">
-                  <Label>Secret Expiry Date</Label>
-                  <Input type="date" value={form.expiryDate} onChange={e => setForm(f => ({ ...f, expiryDate: e.target.value }))} />
+                  <div className="flex items-center gap-2">
+                    <Label>Secret Expiry Date</Label>
+                    {env.expiryDate && <EnvBadge name={env.expiryDate} />}
+                  </div>
+                  {lockedInput("expiryDate", { type: "date", value: form.expiryDate, onChange: e => setForm(f => ({ ...f, expiryDate: e.target.value })) })}
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <Label>Reminder Days Before</Label>
-                  <Input type="number" value={form.reminderDays} onChange={e => setForm(f => ({ ...f, reminderDays: e.target.value }))} min="1" max="365" />
+                  <div className="flex items-center gap-2">
+                    <Label>Reminder Days Before</Label>
+                    {env.reminderDays && <EnvBadge name={env.reminderDays} />}
+                  </div>
+                  {lockedInput("reminderDays", { type: "number", value: form.reminderDays, onChange: e => setForm(f => ({ ...f, reminderDays: e.target.value })), min: "1", max: "365" })}
                 </div>
               </div>
               <div className="flex flex-col gap-1.5">
-                <Label>Reminder Email</Label>
-                <Input type="email" value={form.reminderEmail} onChange={e => setForm(f => ({ ...f, reminderEmail: e.target.value }))} placeholder="admin@example.com" />
+                <div className="flex items-center gap-2">
+                  <Label>Reminder Email</Label>
+                  {env.reminderEmail && <EnvBadge name={env.reminderEmail} />}
+                </div>
+                {lockedInput("reminderEmail", { type: "email", value: form.reminderEmail, onChange: e => setForm(f => ({ ...f, reminderEmail: e.target.value })), placeholder: "admin@example.com" })}
                 <p className="text-xs text-muted-foreground">Receives a daily email when the secret is within the reminder window. Requires SMTP to be configured.</p>
               </div>
               <div className="flex flex-col sm:flex-row gap-2">

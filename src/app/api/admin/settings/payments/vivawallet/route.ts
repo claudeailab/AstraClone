@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
-import { getSetting, setSetting } from "@/lib/encryption";
+import { getSetting, setSetting, getEnvOverride, getEnvVarName } from "@/lib/encryption";
 import { logAudit } from "@/lib/audit";
 
 const schema = z.object({
@@ -21,13 +21,20 @@ export async function GET() {
     getSetting("vivawallet_clientSecret"),
     getSetting("vivawallet_merchantId"),
   ]);
+  const envLocked = (k: string) => { const v = getEnvOverride(k); return v !== undefined && v !== ""; };
+  const env: Record<string, string> = {};
+  const vivaKeys: [string, string][] = [
+    ["vivawallet_enabled","enabled"],["vivawallet_liveMode","liveMode"],["vivawallet_clientId","clientId"],
+    ["vivawallet_clientSecret","clientSecret"],["vivawallet_merchantId","merchantId"],
+  ];
+  for (const [k, f] of vivaKeys) if (envLocked(k)) env[f] = getEnvVarName(k)!;
   return NextResponse.json({ data: {
     enabled: enabled === "true",
     liveMode: liveMode === "true",
     clientId: clientId ?? "",
     clientSecretSet: !!clientSecret,
     merchantId: merchantId ?? "",
-  }});
+  }, env });
 }
 
 export async function POST(req: NextRequest) {

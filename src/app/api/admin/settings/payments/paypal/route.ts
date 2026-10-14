@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
-import { getSetting, setSetting } from "@/lib/encryption";
+import { getSetting, setSetting, getEnvOverride, getEnvVarName } from "@/lib/encryption";
 import { logAudit } from "@/lib/audit";
 
 const schema = z.object({
@@ -19,12 +19,18 @@ export async function GET() {
     getSetting("paypal_clientId"),
     getSetting("paypal_clientSecret"),
   ]);
+  const envLocked = (k: string) => { const v = getEnvOverride(k); return v !== undefined && v !== ""; };
+  const env: Record<string, string> = {};
+  const paypalKeys: [string, string][] = [
+    ["paypal_enabled","enabled"],["paypal_liveMode","liveMode"],["paypal_clientId","clientId"],["paypal_clientSecret","clientSecret"],
+  ];
+  for (const [k, f] of paypalKeys) if (envLocked(k)) env[f] = getEnvVarName(k)!;
   return NextResponse.json({ data: {
     enabled: enabled === "true",
     liveMode: liveMode === "true",
     clientId: clientId ?? "",
     clientSecretSet: !!clientSecret,
-  }});
+  }, env });
 }
 
 export async function POST(req: NextRequest) {
