@@ -41,7 +41,7 @@ function RepoPicker({ label, accounts, connectionId, repo, list, excludeRepo, ne
   return (
     <div className="flex flex-col gap-1.5">
       <Label>{label}</Label>
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="flex flex-col gap-2">
         <Select value={connectionId} onValueChange={onAccount}>
           <SelectTrigger><SelectValue placeholder="GitHub account" /></SelectTrigger>
           <SelectContent>{accounts.map(a => <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>)}</SelectContent>
@@ -239,125 +239,123 @@ export default function SyncsPage() {
         )}
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="max-w-lg max-h-[90dvh] overflow-y-auto">
+          <DialogContent className="max-w-lg md:max-w-3xl max-h-[90dvh] overflow-y-auto md:max-h-none md:overflow-visible">
             <DialogHeader><DialogTitle>{form.id ? "Edit Synchronization" : "New Synchronization"}</DialogTitle></DialogHeader>
-            <div className="flex flex-col gap-4">
-              <RepoPicker
-                label="Source"
-                accounts={accounts}
-                connectionId={form.sourceConnectionId}
-                repo={form.sourceRepo}
-                list={repoLists[form.sourceConnectionId]}
-                needsPush={form.direction === "two_way"}
-                onAccount={v => update({ sourceConnectionId: v, sourceRepo: "", branches: [] })}
-                onRepo={v => update({ sourceRepo: v, branches: [] })}
-              />
-              <RepoPicker
-                label="Destination"
-                accounts={accounts}
-                connectionId={form.destConnectionId}
-                repo={form.destRepo}
-                list={repoLists[form.destConnectionId]}
-                excludeRepo={form.sourceRepo}
-                needsPush
-                onAccount={v => update({ destConnectionId: v, destRepo: "" })}
-                onRepo={v => update({ destRepo: v })}
-              />
-              <div className="flex flex-col gap-1.5">
-                <Label>Direction</Label>
-                <Select value={form.direction} onValueChange={v => update({ direction: v as SyncDirection })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{SYNC_DIRECTIONS.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}</SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  {form.direction === "one_way"
-                    ? "Branches and tags flow from source to destination only."
-                    : "New commits flow whichever way is ahead. Branches changed on both sides are reported as conflicts and left untouched."}
-                </p>
+            <div className="grid gap-x-6 gap-y-4 md:grid-cols-2">
+              <div className="flex flex-col gap-4">
+                <RepoPicker
+                  label="Source"
+                  accounts={accounts}
+                  connectionId={form.sourceConnectionId}
+                  repo={form.sourceRepo}
+                  list={repoLists[form.sourceConnectionId]}
+                  needsPush={form.direction === "two_way"}
+                  onAccount={v => update({ sourceConnectionId: v, sourceRepo: "", branches: [] })}
+                  onRepo={v => update({ sourceRepo: v, branches: [] })}
+                />
+                <RepoPicker
+                  label="Destination"
+                  accounts={accounts}
+                  connectionId={form.destConnectionId}
+                  repo={form.destRepo}
+                  list={repoLists[form.destConnectionId]}
+                  excludeRepo={form.sourceRepo}
+                  needsPush
+                  onAccount={v => update({ destConnectionId: v, destRepo: "" })}
+                  onRepo={v => update({ destRepo: v })}
+                />
+                <div className="flex flex-col gap-1.5">
+                  <Label>Direction</Label>
+                  <Select value={form.direction} onValueChange={v => update({ direction: v as SyncDirection })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{SYNC_DIRECTIONS.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}</SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {form.direction === "one_way" ? "Source → destination only. The source is never changed." : "Changes flow whichever way is ahead; branches changed on both sides are left as conflicts."}
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="flex items-center justify-between gap-4">
+                    <span className="text-sm font-medium">All branches</span>
+                    <Switch checked={form.allBranches} onCheckedChange={v => setForm(f => ({ ...f, allBranches: v }))} />
+                  </label>
+                  {!form.allBranches && (
+                    !form.sourceRepo ? (
+                      <p className="text-xs text-muted-foreground">Select a source to choose branches.</p>
+                    ) : branchOptions === null ? (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />Loading branches…</div>
+                    ) : (
+                      <>
+                        {branchError && <p className="text-xs text-destructive">{branchError}</p>}
+                        <div className="rounded-lg border divide-y divide-border max-h-40 overflow-y-auto">
+                          {branchChoices.map(b => {
+                            const checked = form.branches.includes(b);
+                            return (
+                              <button
+                                key={b}
+                                type="button"
+                                role="checkbox"
+                                aria-checked={checked}
+                                onClick={() => toggleBranch(b)}
+                                className={`w-full flex items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-secondary/50 ${checked ? "bg-primary/5" : ""}`}
+                              >
+                                <span className={`h-4 w-4 rounded border shrink-0 flex items-center justify-center transition-colors ${checked ? "bg-primary border-primary text-primary-foreground" : "border-border"}`}>
+                                  {checked && <Check className="h-3 w-3" />}
+                                </span>
+                                <span className="text-sm font-mono truncate">{b}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <p className="text-xs text-muted-foreground">{form.branches.length} selected{form.direction === "two_way" ? " · from both repositories" : " · from the source"}</p>
+                      </>
+                    )
+                  )}
+                </div>
               </div>
-              <div className="flex flex-col gap-1.5">
-                <Label>Check every</Label>
-                <Select value={form.intervalMinutes} onValueChange={v => setForm(f => ({ ...f, intervalMinutes: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{intervalOptions.map(m => <SelectItem key={m} value={String(m)}>{intervalLabel(m)}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="flex items-center justify-between gap-4">
-                  <span className="text-sm font-medium">All branches</span>
-                  <Switch checked={form.allBranches} onCheckedChange={v => setForm(f => ({ ...f, allBranches: v }))} />
-                </label>
-                {!form.allBranches && (
-                  !form.sourceRepo ? (
-                    <p className="text-xs text-muted-foreground">Select a source to choose branches.</p>
-                  ) : branchOptions === null ? (
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />Loading branches…</div>
-                  ) : (
-                    <>
-                      {branchError && <p className="text-xs text-destructive">{branchError}</p>}
-                      <div className="rounded-lg border divide-y divide-border max-h-56 overflow-y-auto">
-                        {branchChoices.map(b => {
-                          const checked = form.branches.includes(b);
-                          return (
-                            <button
-                              key={b}
-                              type="button"
-                              role="checkbox"
-                              aria-checked={checked}
-                              onClick={() => toggleBranch(b)}
-                              className={`w-full flex items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-secondary/50 ${checked ? "bg-primary/5" : ""}`}
-                            >
-                              <span className={`h-4 w-4 rounded border shrink-0 flex items-center justify-center transition-colors ${checked ? "bg-primary border-primary text-primary-foreground" : "border-border"}`}>
-                                {checked && <Check className="h-3 w-3" />}
-                              </span>
-                              <span className="text-sm font-mono truncate">{b}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <p className="text-xs text-muted-foreground">{form.branches.length} selected{form.direction === "two_way" ? " · from both repositories" : " · from the source"}</p>
-                    </>
-                  )
-                )}
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label>What to sync</Label>
-                <Select value={form.mode} onValueChange={v => setForm(f => ({ ...f, mode: v as SyncMode }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{SYNC_MODES.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">{SYNC_MODES.find(m => m.value === form.mode)?.description}</p>
-              </div>
-              <div className="flex flex-col gap-3 rounded-lg border p-3">
-                <label className="flex items-center justify-between gap-4">
-                  <span className="flex flex-col">
-                    <span className="text-sm">{form.direction === "one_way" ? "Delete in destination when deleted in source" : "Mirror deletions both ways"}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {form.direction === "one_way"
-                        ? "Branches and tags removed from the source are removed from the destination — only if the destination has no other commits on them."
-                        : "A branch or tag deleted on one side is deleted on the other — only if the other side hasn't changed it."}
-                      {" "}Deleted files always follow their commits.
-                    </span>
-                  </span>
-                  <Switch checked={form.propagateDeletes} onCheckedChange={v => setForm(f => ({ ...f, propagateDeletes: v }))} />
-                </label>
-                <label className="flex items-center justify-between gap-4">
-                  <span className="text-sm">Synchronize tags</span>
-                  <Switch checked={form.syncTags} onCheckedChange={v => setForm(f => ({ ...f, syncTags: v }))} />
-                </label>
-                {form.direction === "one_way" && (
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <Label>What to sync</Label>
+                  <Select value={form.mode} onValueChange={v => setForm(f => ({ ...f, mode: v as SyncMode }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{SYNC_MODES.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">{SYNC_MODES.find(m => m.value === form.mode)?.description}</p>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label>Check every</Label>
+                  <Select value={form.intervalMinutes} onValueChange={v => setForm(f => ({ ...f, intervalMinutes: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{intervalOptions.map(m => <SelectItem key={m} value={String(m)}>{intervalLabel(m)}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-3 rounded-lg border p-3">
                   <label className="flex items-center justify-between gap-4">
                     <span className="flex flex-col">
-                      <span className="text-sm">Force push</span>
-                      <span className="text-xs text-muted-foreground">Overwrite destination changes that are not in the source (the source is never modified)</span>
+                      <span className="text-sm">{form.direction === "one_way" ? "Delete in destination when deleted in source" : "Mirror deletions both ways"}</span>
+                      <span className="text-xs text-muted-foreground">Only if the other side has no commits of its own on it.</span>
                     </span>
-                    <Switch checked={form.forcePush} onCheckedChange={v => setForm(f => ({ ...f, forcePush: v }))} />
+                    <Switch checked={form.propagateDeletes} onCheckedChange={v => setForm(f => ({ ...f, propagateDeletes: v }))} />
                   </label>
-                )}
-                <label className="flex items-center justify-between gap-4">
-                  <span className="text-sm">Enabled</span>
-                  <Switch checked={form.enabled} onCheckedChange={v => setForm(f => ({ ...f, enabled: v }))} />
-                </label>
+                  <label className="flex items-center justify-between gap-4">
+                    <span className="text-sm">Synchronize tags</span>
+                    <Switch checked={form.syncTags} onCheckedChange={v => setForm(f => ({ ...f, syncTags: v }))} />
+                  </label>
+                  {form.direction === "one_way" && (
+                    <label className="flex items-center justify-between gap-4">
+                      <span className="flex flex-col">
+                        <span className="text-sm">Overwrite destination changes</span>
+                        <span className="text-xs text-muted-foreground">Commits made directly in the destination are replaced with the source&apos;s version.</span>
+                      </span>
+                      <Switch checked={form.forcePush} onCheckedChange={v => setForm(f => ({ ...f, forcePush: v }))} />
+                    </label>
+                  )}
+                  <label className="flex items-center justify-between gap-4">
+                    <span className="text-sm">Enabled</span>
+                    <Switch checked={form.enabled} onCheckedChange={v => setForm(f => ({ ...f, enabled: v }))} />
+                  </label>
+                </div>
+
               </div>
             </div>
             <DialogFooter>

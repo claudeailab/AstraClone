@@ -118,3 +118,8 @@ Always prefer `mcp__github__*` tools over curl for GitHub API calls — the MCP 
 ## List layouts
 
 - Accounts and synchronizations are compact horizontal rows inside one `Card` (`divide-y`), not card grids. Sync rows use the shared `SyncRow` (admin passes Run/History/Edit/Delete actions, user area passes Details); facts render as one line of small icon+text items (`SyncFacts`). Rows stack vertically below `md`.
+
+## Sync form layout
+
+- The create/edit sync dialog is two columns from `md` up (`md:max-w-3xl`, no dialog scroll: `md:max-h-none md:overflow-visible`): left = source, destination (account above repository), direction, branches; right = what to sync, interval, switches. The branch checklist keeps its own `max-h-40` scroll. Below `md` it is one column and the dialog scrolls.
+- The UI calls `forcePush` "Overwrite destination changes"; keep that wording everywhere user-facing.

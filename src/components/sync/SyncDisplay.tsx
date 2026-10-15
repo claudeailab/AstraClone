@@ -149,7 +149,7 @@ export function SyncFacts({ sync }: { sync: Pick<SyncOverview, "direction" | "br
       {sync.syncTags && <span className={item}><Tag className="h-3 w-3" />Tags</span>}
       {sync.mode === "changes" && <span className={item}><History className="h-3 w-3" />Changes only</span>}
       {sync.propagateDeletes && <span className={item}><Trash2 className="h-3 w-3" />Mirrors deletions</span>}
-      {sync.forcePush && <span className={`${item} text-amber-700 dark:text-amber-400`}><Zap className="h-3 w-3" />Force push</span>}
+      {sync.forcePush && <span className={`${item} text-amber-700 dark:text-amber-400`}><Zap className="h-3 w-3" />Overwrites destination</span>}
     </div>
   );
 }
