@@ -235,13 +235,13 @@ export default function SyncsPage() {
                 sync={s}
                 actions={
                   <>
-                    <Button size="icon" onClick={() => handleRun(s)} disabled={s.running || s.verifying} aria-label="Run now" title="Run now">
+                    <Button size="icon" variant="ghost" className="text-primary hover:text-primary" onClick={() => handleRun(s)} disabled={s.running || s.verifying} aria-label="Run now" title="Run now">
                       {s.running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
                     </Button>
                     <Button size="icon" variant="ghost" aria-label="Verify" title="Verify replica" onClick={() => handleVerify(s)} disabled={s.running || s.verifying}><ShieldCheck className="h-4 w-4" /></Button>
                     <Button size="icon" variant="ghost" aria-label="History" title="History" onClick={() => openHistory(s)}><History className="h-4 w-4" /></Button>
                     <Button size="icon" variant="ghost" aria-label="Edit" title="Edit" onClick={() => openEdit(s)}><Pencil className="h-4 w-4" /></Button>
-                    <Button size="icon" variant="ghost" aria-label="Delete" title="Delete" onClick={() => setDeleteTarget(s)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                    <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-destructive" aria-label="Delete" title="Delete" onClick={() => setDeleteTarget(s)}><Trash2 className="h-4 w-4" /></Button>
                   </>
                 }
               />

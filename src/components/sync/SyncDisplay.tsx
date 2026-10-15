@@ -149,7 +149,7 @@ export function SyncFacts({ sync }: { sync: Pick<SyncOverview, "direction" | "br
       <span className={`${item} font-mono`}><GitBranch className="h-3 w-3" />{sync.branches || "all branches"}</span>
       {sync.syncTags && <span className={item}><Tag className="h-3 w-3" />Tags</span>}
       {sync.propagateDeletes && <span className={item}><Trash2 className="h-3 w-3" />Mirrors deletions</span>}
-      {sync.forcePush && <span className={`${item} text-amber-700 dark:text-amber-400`}><Zap className="h-3 w-3" />Overwrites destination</span>}
+      {sync.forcePush && <span className={item}><Zap className="h-3 w-3" />Overwrites destination</span>}
     </div>
   );
 }
@@ -165,11 +165,7 @@ export function SyncRow({ sync, actions }: { sync: SyncOverview; actions: React.
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <div className={line}>
           <SyncRoute sync={sync} />
-          <div className="flex shrink-0 items-center gap-2">
-            <SyncStatusBadge status={sync.lastStatus} />
-            <VerificationBadge verification={sync.verification} verifying={sync.verifying} />
-            {!sync.enabled && <Badge variant="outline" className="gap-1"><PauseCircle className="h-3 w-3" />Paused</Badge>}
-          </div>
+          <SyncHealth sync={sync} />
         </div>
         <SyncFacts sync={sync} />
         {sync.running || sync.verifying
@@ -255,5 +251,42 @@ export function VerificationPanel({ verification, verifying }: { verification: V
         </ul>
       )}
     </div>
+  );
+}
+
+type Tone = "ok" | "info" | "warn" | "error" | "muted";
+
+const TONE: Record<Tone, { dot: string; text: string }> = {
+  ok: { dot: "bg-emerald-500", text: "text-foreground" },
+  info: { dot: "bg-primary", text: "text-primary" },
+  warn: { dot: "bg-amber-500", text: "text-amber-700 dark:text-amber-400" },
+  error: { dot: "bg-destructive", text: "text-destructive" },
+  muted: { dot: "bg-muted-foreground/40", text: "text-muted-foreground" },
+};
+
+/** Collapses sync status + verification into the one thing worth knowing; colour only when attention is needed. */
+function healthOf(sync: Pick<SyncOverview, "lastStatus" | "running" | "verifying" | "verification">): { tone: Tone; label: string; busy?: boolean } {
+  if (sync.running) return { tone: "info", label: "Syncing", busy: true };
+  if (sync.verifying) return { tone: "info", label: "Verifying", busy: true };
+  if (sync.lastStatus === "failed") return { tone: "error", label: "Failed" };
+  if (sync.lastStatus === "conflict") return { tone: "warn", label: "Conflict" };
+  if (sync.lastStatus === "pending") return { tone: "muted", label: "Not run yet" };
+  const v = sync.verification?.status;
+  if (v === "identical") return { tone: "ok", label: "Exact replica" };
+  if (v === "files_identical") return { tone: "ok", label: "Files identical" };
+  if (v === "different") return { tone: "warn", label: "Not identical" };
+  if (v === "error") return { tone: "error", label: "Verification failed" };
+  return { tone: "muted", label: "In sync · not verified" };
+}
+
+export function SyncHealth({ sync }: { sync: Pick<SyncOverview, "lastStatus" | "running" | "verifying" | "verification" | "enabled"> }) {
+  const h = healthOf(sync);
+  const t = TONE[h.tone];
+  return (
+    <span className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap text-sm" title={sync.verification ? `Verified ${relativeTime(sync.verification.checkedAt)}` : undefined}>
+      {h.busy ? <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" /> : <span className={cn("h-2 w-2 rounded-full", t.dot)} />}
+      <span className={cn("font-medium", t.text)}>{h.label}</span>
+      {!sync.enabled && <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><PauseCircle className="h-3 w-3" />Paused</span>}
+    </span>
   );
 }

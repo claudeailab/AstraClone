@@ -98,7 +98,7 @@ export default function AccountsPage() {
                     {testing === a.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Plug className="h-4 w-4 mr-1" />Test</>}
                   </Button>
                   <Button size="icon" variant="ghost" aria-label="Edit" title="Edit" onClick={() => { setForm({ id: a.id, name: a.name, token: "" }); setDialogOpen(true); }}><Pencil className="h-4 w-4" /></Button>
-                  <Button size="icon" variant="ghost" aria-label="Delete" title="Delete" onClick={() => setDeleteTarget(a)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                  <Button size="icon" variant="ghost" className="text-muted-foreground hover:text-destructive" aria-label="Delete" title="Delete" onClick={() => setDeleteTarget(a)}><Trash2 className="h-4 w-4" /></Button>
                 </div>
               </div>
             ))}

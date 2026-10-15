@@ -129,3 +129,9 @@ Always prefer `mcp__github__*` tools over curl for GitHub API calls — the MCP 
 - `verifyRepositories()` (sync-git) fetches both sides (read-only) and compares every in-scope branch/tag id; differing ids are re-checked by tree id (`<sha>^{tree}`) to distinguish "files identical, history differs". Destination-only refs count as differences. Result: `Verification` (`identical` | `files_identical` | `different` | `error`) with per-ref `differences`.
 - Runs automatically at the end of every sync (progress 80–100%) and on demand via `POST /api/admin/syncs/verify` (`verifySync()`; no run row, does not change `last_status`). Stored in `syncs.verification` (latest) and `sync_runs.verification` (per run). The engine lock (`active` map: "sync" | "verify") prevents a sync and a verification from overlapping.
 - UI: `VerificationBadge` on every sync row (admin + user), `VerificationPanel` in admin History and user Details, per-run summary in run history.
+
+## Status colour discipline
+
+- A sync row shows ONE status (`SyncHealth`): sync status + verification collapsed into the single most relevant label with a small dot — "Exact replica" / "Files identical" (green dot, neutral text), "Not identical" / "Conflict" (amber), "Failed" / "Verification failed" (red), "Syncing" / "Verifying" (spinner, primary), "Not run yet" / "In sync · not verified" (muted). Colour is reserved for states needing attention; healthy rows stay neutral.
+- Configuration facts (`SyncFacts`, including "Overwrites destination") are always neutral muted text — settings are not warnings.
+- Row actions are ghost icon buttons; Run uses the primary text colour, Delete is muted and turns red only on hover. Same on the accounts list. Filled badges (`SyncStatusBadge`, `VerificationBadge`) are used only inside detail views (history, verification panel).
