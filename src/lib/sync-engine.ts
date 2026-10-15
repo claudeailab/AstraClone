@@ -6,13 +6,13 @@ import { db } from "./db";
 import { github_connections, repositories, sync_runs, syncs } from "./db/schema";
 import { decrypt } from "./encryption";
 import { inspectRepo, parseRepoRef, repoUrl } from "./github";
-import { syncRepositories, type RefState, type SyncResult } from "./sync-git";
-import type { SyncOverview, SyncProgress } from "./sync-shared";
+import { syncRepositories, verifyRepositories, type RefState, type SyncResult } from "./sync-git";
+import type { SyncOverview, SyncProgress, Verification } from "./sync-shared";
 
 const WORK_ROOT = path.join(os.tmpdir(), "astraclone-sync");
 const KEEP_RUNS = 50;
 const TICK_MS = 60_000;
-const active = new Set<number>();
+const active = new Map<number, "sync" | "verify">();
 const progress = new Map<number, SyncProgress>();
 let ticking = false;
 
@@ -43,16 +43,57 @@ async function loadRemote(repoId: number) {
   return { repo: row, remote: { url: repoUrl(row.owner, row.name), token: decrypt(row.token) } };
 }
 
-export function isSyncRunning(id: number) {
+export function isSyncBusy(id: number) {
   return active.has(id);
+}
+
+type SyncRow = typeof syncs.$inferSelect;
+
+function scopeOf(cfg: SyncRow) {
+  return { direction: cfg.direction === "two_way" ? "two_way" as const : "one_way" as const, branches: cfg.branches, syncTags: cfg.syncTags };
+}
+
+async function loadPair(cfg: SyncRow) {
+  const [source, dest] = await Promise.all([loadRemote(cfg.sourceRepoId), loadRemote(cfg.destRepoId)]);
+  if (sameRepository(source.repo, dest.repo)) throw new Error("Source and destination are the same GitHub repository — sync refused");
+  return { source: source.remote, dest: dest.remote };
+}
+
+function failedVerification(err: unknown): Verification {
+  return { status: "error", checkedAt: new Date().toISOString(), branches: 0, identicalBranches: 0, tags: 0, identicalTags: 0, differences: [], error: err instanceof Error ? err.message : String(err) };
+}
+
+/** Compares both repositories without changing either; stores the result on the sync. */
+export async function verifySync(id: number): Promise<boolean> {
+  if (active.has(id)) return false;
+  active.set(id, "verify");
+  try {
+    const [cfg] = await db.select().from(syncs).where(eq(syncs.id, id)).limit(1);
+    if (!cfg) return false;
+    let verification: Verification;
+    try {
+      const { source, dest } = await loadPair(cfg);
+      verification = await verifyRepositories(workdir(id), source, dest, scopeOf(cfg), (stage, percent) => progress.set(id, { stage, percent: Math.round(percent) }));
+    } catch (err) {
+      verification = failedVerification(err);
+    }
+    await db.update(syncs).set({ verification: JSON.stringify(verification) }).where(eq(syncs.id, id));
+    return true;
+  } finally {
+    active.delete(id);
+    progress.delete(id);
+  }
 }
 
 export async function runSync(id: number, triggeredBy: "schedule" | "manual"): Promise<boolean> {
   if (active.has(id)) return false;
-  active.add(id);
+  active.set(id, "sync");
   const startedAt = new Date();
   let runId: number | null = null;
   let result: SyncResult;
+  let verification: Verification | null = null;
+  const report = (from: number, span: number) => (stage: string, percent: number) =>
+    progress.set(id, { stage, percent: Math.min(100, Math.round(from + (percent / 100) * span)) });
 
   try {
     const [cfg] = await db.select().from(syncs).where(eq(syncs.id, id)).limit(1);
@@ -61,18 +102,19 @@ export async function runSync(id: number, triggeredBy: "schedule" | "manual"): P
     const [ins] = await db.insert(sync_runs).values({ syncId: id, triggeredBy, status: "running", startedAt });
     runId = ins.insertId;
 
-    const [source, dest] = await Promise.all([loadRemote(cfg.sourceRepoId), loadRemote(cfg.destRepoId)]);
-    if (sameRepository(source.repo, dest.repo)) throw new Error("Source and destination are the same GitHub repository — sync refused");
+    const { source, dest } = await loadPair(cfg);
     let previous: RefState | null = null;
     try { previous = cfg.refState ? JSON.parse(cfg.refState) as RefState : null; } catch { previous = null; }
-    result = await syncRepositories(workdir(id), source.remote, dest.remote, {
-      direction: cfg.direction === "two_way" ? "two_way" : "one_way",
-      branches: cfg.branches,
-      syncTags: cfg.syncTags,
+    result = await syncRepositories(workdir(id), source, dest, {
+      ...scopeOf(cfg),
       forcePush: cfg.forcePush,
-      mode: cfg.mode === "changes" ? "changes" : "full",
       propagateDeletes: cfg.propagateDeletes,
-    }, previous, (stage, percent) => progress.set(id, { stage, percent: Math.min(100, Math.round(percent)) }));
+    }, previous, report(0, 80));
+    try {
+      verification = await verifyRepositories(workdir(id), source, dest, scopeOf(cfg), report(80, 20));
+    } catch (err) {
+      verification = failedVerification(err);
+    }
   } catch (err) {
     result = { status: "failed", message: err instanceof Error ? err.message : String(err), details: [], changes: [], filesChanged: 0, state: null };
   }
@@ -82,12 +124,14 @@ export async function runSync(id: number, triggeredBy: "schedule" | "manual"): P
       lastStatus: result.status,
       lastMessage: result.message,
       ...(result.state ? { refState: JSON.stringify(result.state) } : {}),
+      ...(verification ? { verification: JSON.stringify(verification) } : {}),
     }).where(eq(syncs.id, id));
     if (runId) {
       await db.update(sync_runs)
         .set({
           status: result.status, message: result.message, details: result.details.join("\n"),
-          changes: result.changes.length ? JSON.stringify(result.changes) : null, filesChanged: result.filesChanged, finishedAt: new Date(),
+          changes: result.changes.length ? JSON.stringify(result.changes) : null, filesChanged: result.filesChanged,
+          verification: verification ? JSON.stringify(verification) : null, finishedAt: new Date(),
         })
         .where(eq(sync_runs.id, runId));
       const [cutoff] = await db.select({ id: sync_runs.id }).from(sync_runs)
@@ -164,15 +208,16 @@ export async function listSyncOverview(): Promise<SyncOverview[]> {
     branches: s.branches,
     syncTags: s.syncTags,
     forcePush: s.forcePush,
-    mode: s.mode === "changes" ? "changes" : "full",
     propagateDeletes: s.propagateDeletes,
     intervalMinutes: s.intervalMinutes,
     enabled: s.enabled,
-    lastStatus: active.has(s.id) ? "running" : s.lastStatus,
+    lastStatus: active.get(s.id) === "sync" ? "running" : s.lastStatus,
     lastMessage: s.lastMessage,
     lastRunAt: s.lastRunAt?.toISOString() ?? null,
-    running: active.has(s.id),
+    running: active.get(s.id) === "sync",
+    verifying: active.get(s.id) === "verify",
     progress: progress.get(s.id) ?? null,
+    verification: parseVerification(s.verification),
     recentRuns: runs[i].map(r => ({ ...r, startedAt: r.startedAt.toISOString(), finishedAt: r.finishedAt?.toISOString() ?? null })),
   }));
 }
@@ -210,4 +255,9 @@ export async function pruneUnusedRepositories() {
   const used = await db.select({ src: syncs.sourceRepoId, dst: syncs.destRepoId }).from(syncs);
   const ids = [...new Set(used.flatMap(u => [u.src, u.dst]))];
   await db.delete(repositories).where(ids.length ? notInArray(repositories.id, ids) : undefined);
+}
+
+export function parseVerification(raw: string | null): Verification | null {
+  if (!raw) return null;
+  try { return JSON.parse(raw) as Verification; } catch { return null; }
 }

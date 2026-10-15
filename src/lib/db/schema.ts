@@ -111,9 +111,9 @@ export const syncs = mysqlTable("astraclone_syncs", {
   branches: varchar("branches", { length: 1000 }).notNull().default(""),
   syncTags: boolean("sync_tags").notNull().default(true),
   forcePush: boolean("force_push").notNull().default(false),
-  mode: varchar("mode", { length: 20 }).notNull().default("full"),
   propagateDeletes: boolean("propagate_deletes").notNull().default(false),
   refState: mediumtext("ref_state"),
+  verification: mediumtext("verification"),
   intervalMinutes: int("interval_minutes").notNull().default(15),
   enabled: boolean("enabled").notNull().default(true),
   lastStatus: varchar("last_status", { length: 20 }).notNull().default("pending"),
@@ -131,6 +131,7 @@ export const sync_runs = mysqlTable("astraclone_sync_runs", {
   details: text("details"),
   changes: mediumtext("changes"),
   filesChanged: int("files_changed").notNull().default(0),
+  verification: mediumtext("verification"),
   startedAt: timestamp("started_at").notNull(),
   finishedAt: timestamp("finished_at"),
 });

@@ -1,9 +1,9 @@
 "use client";
 
-import { ArrowLeftRight, ArrowRight, ChevronRight, Clock, FileText, GitBranch, History, Loader2, PauseCircle, Tag, Trash2, Zap } from "lucide-react";
+import { ArrowLeftRight, ArrowRight, ChevronRight, Clock, FileText, GitBranch, Loader2, PauseCircle, ShieldAlert, ShieldCheck, ShieldQuestion, Tag, Trash2, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { FILE_STATUS, intervalLabel, nextRunAt, relativeTime, syncStatus, type RefChange, type SyncOverview, type SyncProgress, type SyncRunSummary } from "@/lib/sync-shared";
+import { FILE_STATUS, VERIFY_STATUS, intervalLabel, nextRunAt, relativeTime, syncStatus, type RefChange, type SyncOverview, type SyncProgress, type SyncRunSummary, type Verification } from "@/lib/sync-shared";
 
 export function SyncStatusBadge({ status }: { status: string }) {
   const s = syncStatus(status);
@@ -47,7 +47,7 @@ function duration(r: SyncRunSummary) {
   return s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`;
 }
 
-export interface RunDetail extends SyncRunSummary { details: string | null; changes: RefChange[] }
+export interface RunDetail extends SyncRunSummary { details: string | null; changes: RefChange[]; verification: Verification | null }
 
 const ACTION_LABEL: Record<RefChange["action"], string> = { created: "created", updated: "updated", forced: "force-updated", deleted: "deleted" };
 
@@ -108,6 +108,7 @@ export function RunHistoryList({ runs }: { runs: RunDetail[] }) {
               {r.filesChanged > 0 && <span className="flex items-center gap-1 text-xs text-muted-foreground"><FileText className="h-3 w-3" />{r.filesChanged} file{r.filesChanged === 1 ? "" : "s"}</span>}
             </div>
             {r.message && <p className="text-sm break-words">{r.message}</p>}
+            {r.verification && <VerificationSummary verification={r.verification} />}
             {r.changes.length > 0 && <ul className="flex flex-col">{r.changes.map((c, i) => <RefChangeItem key={i} c={c} />)}</ul>}
             {conflicts.length > 0 && (
               <ul className="flex flex-col gap-0.5">
@@ -136,7 +137,7 @@ export function SyncProgressBar({ progress }: { progress: SyncProgress | null })
   );
 }
 
-export function SyncFacts({ sync }: { sync: Pick<SyncOverview, "direction" | "branches" | "syncTags" | "forcePush" | "intervalMinutes" | "mode" | "propagateDeletes"> }) {
+export function SyncFacts({ sync }: { sync: Pick<SyncOverview, "direction" | "branches" | "syncTags" | "forcePush" | "intervalMinutes" | "propagateDeletes"> }) {
   const item = "inline-flex items-center gap-1 whitespace-nowrap";
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -147,7 +148,6 @@ export function SyncFacts({ sync }: { sync: Pick<SyncOverview, "direction" | "br
       <span className={item}><Clock className="h-3 w-3" />{intervalLabel(sync.intervalMinutes)}</span>
       <span className={`${item} font-mono`}><GitBranch className="h-3 w-3" />{sync.branches || "all branches"}</span>
       {sync.syncTags && <span className={item}><Tag className="h-3 w-3" />Tags</span>}
-      {sync.mode === "changes" && <span className={item}><History className="h-3 w-3" />Changes only</span>}
       {sync.propagateDeletes && <span className={item}><Trash2 className="h-3 w-3" />Mirrors deletions</span>}
       {sync.forcePush && <span className={`${item} text-amber-700 dark:text-amber-400`}><Zap className="h-3 w-3" />Overwrites destination</span>}
     </div>
@@ -162,12 +162,13 @@ export function SyncRow({ sync, actions }: { sync: SyncOverview; actions: React.
         <div className="flex flex-wrap items-center gap-2">
           <SyncRoute sync={sync} />
           <SyncStatusBadge status={sync.lastStatus} />
+          <VerificationBadge verification={sync.verification} verifying={sync.verifying} />
           {!sync.enabled && <Badge variant="outline" className="gap-1"><PauseCircle className="h-3 w-3" />Paused</Badge>}
         </div>
         <SyncFacts sync={sync} />
       </div>
       <div className="flex min-w-0 flex-col gap-1 md:basis-1/3">
-        {sync.running
+        {sync.running || sync.verifying
           ? <SyncProgressBar progress={sync.progress} />
           : <p className="truncate text-sm" title={sync.lastMessage ?? undefined}>{sync.lastMessage ?? "Not run yet"}</p>}
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
@@ -176,6 +177,73 @@ export function SyncRow({ sync, actions }: { sync: SyncOverview; actions: React.
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-1">{actions}</div>
+    </div>
+  );
+}
+
+export function VerificationBadge({ verification, verifying }: { verification: Verification | null; verifying?: boolean }) {
+  if (verifying) return <Badge className="gap-1 border-transparent bg-primary/15 text-primary"><Loader2 className="h-3 w-3 animate-spin" />Verifying</Badge>;
+  if (!verification) return <Badge variant="outline" className="gap-1 text-muted-foreground"><ShieldQuestion className="h-3 w-3" />Not verified</Badge>;
+  const v = VERIFY_STATUS[verification.status];
+  const Icon = verification.status === "identical" || verification.status === "files_identical" ? ShieldCheck : ShieldAlert;
+  return (
+    <Badge className={cn("gap-1 whitespace-nowrap", v.className)} title={`Checked ${relativeTime(verification.checkedAt)}`}>
+      <Icon className="h-3 w-3" />{v.label}
+    </Badge>
+  );
+}
+
+function VerificationSummary({ verification }: { verification: Verification }) {
+  if (verification.status === "error") return <p className="text-xs text-destructive break-words">Verification failed: {verification.error}</p>;
+  return (
+    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+      <VerificationBadge verification={verification} />
+      <span>{verification.identicalBranches}/{verification.branches} branches identical{verification.tags ? ` · ${verification.identicalTags}/${verification.tags} tags identical` : ""}</span>
+    </p>
+  );
+}
+
+function describeDifference(d: Verification["differences"][number]) {
+  if (!d.destination) return "Missing in destination";
+  if (!d.source) return "Only in destination";
+  return d.sameFiles ? "Same files, different history" : "Different files";
+}
+
+/** Latest proof that the destination matches the source, with every mismatching branch/tag listed. */
+export function VerificationPanel({ verification, verifying }: { verification: Verification | null; verifying?: boolean }) {
+  if (verifying) return <div className="flex items-center gap-2 rounded-lg border p-3 text-sm text-primary"><Loader2 className="h-4 w-4 animate-spin" />Verifying both repositories…</div>;
+  if (!verification) return <p className="rounded-lg border p-3 text-sm text-muted-foreground">Not verified yet — runs automatically after every sync.</p>;
+  const explanation = {
+    identical: "Every branch and tag points to the same commit in both repositories. Commit ids are hashes of the complete contents, so all files are byte-for-byte identical.",
+    files_identical: "All files are byte-for-byte identical, but some commits differ (for example, different history or commit metadata).",
+    different: "Some branches or tags do not match. Details below.",
+    error: verification.error ?? "Verification could not be completed.",
+  }[verification.status];
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <VerificationBadge verification={verification} />
+        <span className="text-xs text-muted-foreground">checked {relativeTime(verification.checkedAt)}</span>
+      </div>
+      {verification.status !== "error" && (
+        <p className="text-sm">
+          {verification.identicalBranches}/{verification.branches} branches identical
+          {verification.tags ? ` · ${verification.identicalTags}/${verification.tags} tags identical` : ""}
+        </p>
+      )}
+      <p className="text-xs text-muted-foreground">{explanation}</p>
+      {verification.differences.length > 0 && (
+        <ul className="flex flex-col gap-1 max-h-48 overflow-y-auto">
+          {verification.differences.map(d => (
+            <li key={`${d.kind}:${d.ref}`} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+              {d.kind === "tag" ? <Tag className="h-3 w-3 text-muted-foreground" /> : <GitBranch className="h-3 w-3 text-muted-foreground" />}
+              <span className="font-mono break-all">{d.ref}</span>
+              <span className={d.sameFiles ? "text-primary" : "text-amber-700 dark:text-amber-400"}>{describeDifference(d)}</span>
+              <span className="font-mono text-muted-foreground">{short(d.source) || "—"} → {short(d.destination) || "—"}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

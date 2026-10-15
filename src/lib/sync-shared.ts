@@ -51,7 +51,6 @@ export interface SyncOverview {
   branches: string;
   syncTags: boolean;
   forcePush: boolean;
-  mode: SyncMode;
   propagateDeletes: boolean;
   intervalMinutes: number;
   enabled: boolean;
@@ -60,6 +59,8 @@ export interface SyncOverview {
   lastRunAt: string | null;
   running: boolean;
   progress: SyncProgress | null;
+  verifying: boolean;
+  verification: Verification | null;
   recentRuns: SyncRunSummary[];
 }
 
@@ -73,11 +74,6 @@ export function nextRunAt(s: Pick<SyncOverview, "enabled" | "lastRunAt" | "inter
   return new Date(new Date(s.lastRunAt).getTime() + s.intervalMinutes * 60_000).toISOString();
 }
 
-export const SYNC_MODES = [
-  { value: "full", label: "Everything", description: "Make the destination match the source for the selected branches and tags." },
-  { value: "changes", label: "Only changes from now on", description: "The first run records a starting point. After that, only branches and tags that change are synced; existing differences are left alone." },
-] as const;
-export type SyncMode = typeof SYNC_MODES[number]["value"];
 
 export interface FileChange { status: string; path: string; from?: string }
 export interface RefChange {
@@ -99,4 +95,31 @@ export const FILE_STATUS: Record<string, { label: string; className: string }> =
   R: { label: "Renamed", className: "text-amber-700 dark:text-amber-400" },
   C: { label: "Copied", className: "text-amber-700 dark:text-amber-400" },
   T: { label: "Type changed", className: "text-muted-foreground" },
+};
+
+export interface RefDifference {
+  ref: string;
+  kind: "branch" | "tag";
+  source: string | null;
+  destination: string | null;
+  /** Commit ids differ but the file trees are byte-identical. */
+  sameFiles: boolean;
+}
+
+export interface Verification {
+  status: "identical" | "files_identical" | "different" | "error";
+  checkedAt: string;
+  branches: number;
+  identicalBranches: number;
+  tags: number;
+  identicalTags: number;
+  differences: RefDifference[];
+  error?: string;
+}
+
+export const VERIFY_STATUS: Record<Verification["status"], { label: string; className: string }> = {
+  identical: { label: "Exact replica", className: "border-transparent bg-emerald-500/15 text-emerald-700 dark:text-emerald-400" },
+  files_identical: { label: "Files identical", className: "border-transparent bg-primary/15 text-primary" },
+  different: { label: "Not identical", className: "border-transparent bg-amber-500/15 text-amber-700 dark:text-amber-400" },
+  error: { label: "Verification failed", className: "border-transparent bg-destructive/15 text-destructive" },
 };

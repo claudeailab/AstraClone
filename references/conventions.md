@@ -103,9 +103,9 @@ Always prefer `mcp__github__*` tools over curl for GitHub API calls — the MCP 
 - Guards: `requireAdmin()` for admin pages/APIs, `requireUserArea()` for the user area (admins may view it too).
 - Startup normalizes any legacy group permissions to one of the two roles.
 
-## Sync state, modes, deletions, progress
+## Sync state, deletions, progress
 
-- `syncs.ref_state` (JSON `{src, dst}` of `heads/<b>`/`tags/<t>` → sha after the last run) drives `mode: "changes"` (only refs that moved since the last run; first run = baseline, nothing pushed) and `propagateDeletes` (a ref in the previous state but gone now is deleted on the other side only if that side still equals the previous source sha; `forcePush` overrides in one-way). Conflicted refs keep their previous state so they are retried. State is reset (NULL) when source, destination, direction, branches, tags or mode change.
+- `syncs.ref_state` (JSON `{src, dst}` of `heads/<b>`/`tags/<t>` → sha after the last run) drives `propagateDeletes` (a ref in the previous state but gone now is deleted on the other side only if that side still equals the previous source sha; `forcePush` overrides in one-way). Conflicted refs keep their previous state so they are retried. State (and the stored verification) is reset (NULL) when source, destination, direction, branches or tags change. Every sync makes the destination match the source — there is no partial/"changes only" mode (removed: exact replicas are the product's guarantee).
 - `sync_runs.changes` (JSON `RefChange[]`, ≤1000 files per ref) + `files_changed`; new branches list files vs the merge-base with the other side's default branch. Served to admins and users via `/api/syncs/runs?id=`.
 - Progress: `syncRepositories(..., onProgress)` reports stage + percent (git `--progress` parsed from stderr via `spawn`); kept in memory in `sync-engine.ts` and returned as `SyncOverview.progress` while running; UI polls every 3s while anything runs.
 
@@ -123,3 +123,9 @@ Always prefer `mcp__github__*` tools over curl for GitHub API calls — the MCP 
 
 - The create/edit sync dialog is two columns from `md` up (`md:max-w-3xl`, no dialog scroll: `md:max-h-none md:overflow-visible`): left = source, destination (account above repository), direction, branches; right = what to sync, interval, switches. The branch checklist keeps its own `max-h-40` scroll. Below `md` it is one column and the dialog scrolls.
 - The UI calls `forcePush` "Overwrite destination changes"; keep that wording everywhere user-facing.
+
+## Verification
+
+- `verifyRepositories()` (sync-git) fetches both sides (read-only) and compares every in-scope branch/tag id; differing ids are re-checked by tree id (`<sha>^{tree}`) to distinguish "files identical, history differs". Destination-only refs count as differences. Result: `Verification` (`identical` | `files_identical` | `different` | `error`) with per-ref `differences`.
+- Runs automatically at the end of every sync (progress 80–100%) and on demand via `POST /api/admin/syncs/verify` (`verifySync()`; no run row, does not change `last_status`). Stored in `syncs.verification` (latest) and `sync_runs.verification` (per run). The engine lock (`active` map: "sync" | "verify") prevents a sync and a verification from overlapping.
+- UI: `VerificationBadge` on every sync row (admin + user), `VerificationPanel` in admin History and user Details, per-run summary in run history.

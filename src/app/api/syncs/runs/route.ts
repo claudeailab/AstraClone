@@ -4,6 +4,7 @@ import { getUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { sync_runs } from "@/lib/db/schema";
 import type { RefChange } from "@/lib/sync-shared";
+import { parseVerification } from "@/lib/sync-engine";
 
 export async function GET(req: NextRequest) {
   if (!(await getUser())?.role) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -13,7 +14,7 @@ export async function GET(req: NextRequest) {
   const runs = rows.map(r => {
     let changes: RefChange[] = [];
     try { changes = r.changes ? JSON.parse(r.changes) : []; } catch { changes = []; }
-    return { ...r, changes };
+    return { ...r, changes, verification: parseVerification(r.verification) };
   });
   return NextResponse.json({ runs });
 }

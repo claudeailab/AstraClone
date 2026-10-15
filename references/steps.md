@@ -30,7 +30,7 @@ Any change to `sync-git.ts` must re-run the source-protection suite: snapshot `g
 
 ## Engine test suites
 
-Three suites run `sync-git.ts` against local bare repos (`node --experimental-strip-types`): regression (create/ff/conflict/force/two-way/filter), source protection, and modes/deletions/files/progress (deletions on/off/forced/conflicting, destination-only refs never deleted, baseline + changes-only, conflict retry, two-way deletion both ways, M/A/D/R file lists, progress stages). Thread `result.state` into the next call to simulate consecutive runs. All must pass before pushing engine changes.
+Three suites run `sync-git.ts` against local bare repos (`node --experimental-strip-types`): regression (create/ff/conflict/force/two-way/filter), source protection, deletions/files/progress (deletions on/off/forced/conflicting, destination-only refs never deleted, conflict retry, two-way deletion both ways, M/A/D/R file lists, progress stages). Thread `result.state` into the next call to simulate consecutive runs. A fourth suite covers verification (empty destination, exact replica after sync, tampered destination, same tree/different commit → files identical, destination-only refs, never writes, scope respected). All must pass before pushing engine changes. For end-to-end checks through `sync-engine.ts` + MySQL, run the real modules with `npx tsx` and point `https://github.com/` at local bare repos via a `GIT_CONFIG_GLOBAL` file containing `[url "/path/"] insteadOf = https://github.com/` (symlink `node_modules` next to the script).
 
 ## Running the full app locally in CCR
 

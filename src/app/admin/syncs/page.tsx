@@ -9,10 +9,10 @@ import { Switch } from "@/components/ui/switch";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Plus, Pencil, Trash2, Play, History, Check } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, Play, History, Check, ShieldCheck } from "lucide-react";
 import { pageWrapper, pageInner, pageTitle, muted } from "@/lib/ui-conventions";
-import { SYNC_DIRECTIONS, SYNC_INTERVALS, SYNC_MODES, intervalLabel, routeLabel, type SyncDirection, type SyncMode, type SyncOverview } from "@/lib/sync-shared";
-import { RunHistoryList, SyncRoute, SyncRow, type RunDetail } from "@/components/sync/SyncDisplay";
+import { SYNC_DIRECTIONS, SYNC_INTERVALS, intervalLabel, routeLabel, type SyncDirection, type SyncOverview } from "@/lib/sync-shared";
+import { RunHistoryList, SyncRoute, SyncRow, VerificationPanel, type RunDetail } from "@/components/sync/SyncDisplay";
 
 interface Account { id: number; name: string; username: string }
 interface AccountRepo { fullName: string; isPrivate: boolean; canPush: boolean }
@@ -20,7 +20,7 @@ type RepoList = AccountRepo[] | "loading" | { error: string };
 
 const emptyForm = {
   id: 0, sourceConnectionId: "", sourceRepo: "", destConnectionId: "", destRepo: "", direction: "one_way" as SyncDirection,
-  branches: [] as string[], allBranches: true, syncTags: true, forcePush: false, mode: "full" as SyncMode, propagateDeletes: false, intervalMinutes: "15", enabled: true,
+  branches: [] as string[], allBranches: true, syncTags: true, forcePush: false, propagateDeletes: false, intervalMinutes: "15", enabled: true,
 };
 type SyncForm = typeof emptyForm;
 
@@ -90,7 +90,7 @@ export default function SyncsPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const anyRunning = syncs.some(s => s.running);
+  const anyRunning = syncs.some(s => s.running || s.verifying);
   useEffect(() => {
     const t = setInterval(load, anyRunning ? 3_000 : 30_000);
     return () => clearInterval(t);
@@ -141,7 +141,7 @@ export default function SyncsPage() {
     openForm({
       id: s.id, sourceConnectionId: String(s.sourceConnectionId), sourceRepo: s.source,
       destConnectionId: String(s.destConnectionId), destRepo: s.destination, direction: s.direction,
-      branches, allBranches: !branches.length, syncTags: s.syncTags, forcePush: s.forcePush, mode: s.mode, propagateDeletes: s.propagateDeletes, intervalMinutes: String(s.intervalMinutes), enabled: s.enabled,
+      branches, allBranches: !branches.length, syncTags: s.syncTags, forcePush: s.forcePush, propagateDeletes: s.propagateDeletes, intervalMinutes: String(s.intervalMinutes), enabled: s.enabled,
     });
   }
 
@@ -156,7 +156,7 @@ export default function SyncsPage() {
         ...(form.id ? { id: form.id } : {}),
         sourceConnectionId: Number(form.sourceConnectionId), sourceRepo: form.sourceRepo,
         destConnectionId: Number(form.destConnectionId), destRepo: form.destRepo, direction: form.direction,
-        branches: form.allBranches ? "" : form.branches.join(", "), syncTags: form.syncTags, forcePush: form.forcePush, mode: form.mode, propagateDeletes: form.propagateDeletes, intervalMinutes: Number(form.intervalMinutes), enabled: form.enabled,
+        branches: form.allBranches ? "" : form.branches.join(", "), syncTags: form.syncTags, forcePush: form.forcePush, propagateDeletes: form.propagateDeletes, intervalMinutes: Number(form.intervalMinutes), enabled: form.enabled,
       };
       const r = await fetch("/api/admin/syncs", {
         method: form.id ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
@@ -176,6 +176,16 @@ export default function SyncsPage() {
     const d = await r.json();
     if (!r.ok) { toast.error(d.error ?? "Could not start"); return; }
     toast.success(`Started ${routeLabel(s)}`);
+    load();
+  }
+
+  async function handleVerify(s: SyncOverview) {
+    const r = await fetch("/api/admin/syncs/verify", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: s.id }),
+    });
+    const d = await r.json();
+    if (!r.ok) { toast.error(d.error ?? "Could not start verification"); return; }
+    toast.success(`Verifying ${routeLabel(s)}`);
     load();
   }
 
@@ -225,9 +235,10 @@ export default function SyncsPage() {
                 sync={s}
                 actions={
                   <>
-                    <Button size="sm" onClick={() => handleRun(s)} disabled={s.running} aria-label="Run now">
+                    <Button size="sm" onClick={() => handleRun(s)} disabled={s.running || s.verifying} aria-label="Run now">
                       {s.running ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Play className="h-4 w-4 mr-1" />Run</>}
                     </Button>
+                    <Button size="icon" variant="ghost" aria-label="Verify" title="Verify replica" onClick={() => handleVerify(s)} disabled={s.running || s.verifying}><ShieldCheck className="h-4 w-4" /></Button>
                     <Button size="icon" variant="ghost" aria-label="History" title="History" onClick={() => openHistory(s)}><History className="h-4 w-4" /></Button>
                     <Button size="icon" variant="ghost" aria-label="Edit" title="Edit" onClick={() => openEdit(s)}><Pencil className="h-4 w-4" /></Button>
                     <Button size="icon" variant="ghost" aria-label="Delete" title="Delete" onClick={() => setDeleteTarget(s)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
@@ -315,14 +326,6 @@ export default function SyncsPage() {
               </div>
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <Label>What to sync</Label>
-                  <Select value={form.mode} onValueChange={v => setForm(f => ({ ...f, mode: v as SyncMode }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{SYNC_MODES.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">{SYNC_MODES.find(m => m.value === form.mode)?.description}</p>
-                </div>
-                <div className="flex flex-col gap-1.5">
                   <Label>Check every</Label>
                   <Select value={form.intervalMinutes} onValueChange={v => setForm(f => ({ ...f, intervalMinutes: v }))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
@@ -371,6 +374,7 @@ export default function SyncsPage() {
           <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
             <DialogHeader><DialogTitle>History</DialogTitle></DialogHeader>
             {history && <SyncRoute sync={history.sync} />}
+            {history && <VerificationPanel verification={syncs.find(x => x.id === history.sync.id)?.verification ?? history.sync.verification} verifying={syncs.find(x => x.id === history.sync.id)?.verifying} />}
             {history?.runs ? <RunHistoryList runs={history.runs} /> : <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin" /></div>}
           </DialogContent>
         </Dialog>

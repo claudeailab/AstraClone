@@ -16,7 +16,6 @@ const syncSchema = z.object({
   branches: z.string().trim().max(1000).regex(/^[A-Za-z0-9._/*,\s-]*$/, "Branches may only contain names, * wildcards and commas"),
   syncTags: z.boolean(),
   forcePush: z.boolean(),
-  mode: z.enum(["full", "changes"]),
   propagateDeletes: z.boolean(),
   intervalMinutes: z.number().int().min(1).max(1440),
   enabled: z.boolean(),
@@ -57,7 +56,6 @@ async function prepare(s: SyncInput, excludeId?: number) {
       branches: s.branches.split(",").map(b => b.trim()).filter(Boolean).join(", "),
       syncTags: s.syncTags,
       forcePush: s.direction === "one_way" && s.forcePush,
-      mode: s.mode,
       propagateDeletes: s.propagateDeletes,
       intervalMinutes: s.intervalMinutes,
       enabled: s.enabled,
@@ -68,7 +66,7 @@ async function prepare(s: SyncInput, excludeId?: number) {
 type SyncValues = NonNullable<Awaited<ReturnType<typeof prepare>>["values"]>;
 
 async function describe(v: SyncValues) {
-  return `route=${await describeRoute(v.sourceRepoId, v.destRepoId, v.direction)}; branches=${v.branches || "all"}; tags=${v.syncTags}; force=${v.forcePush}; mode=${v.mode}; deletes=${v.propagateDeletes}; every=${v.intervalMinutes}m; enabled=${v.enabled}`;
+  return `route=${await describeRoute(v.sourceRepoId, v.destRepoId, v.direction)}; branches=${v.branches || "all"}; tags=${v.syncTags}; force=${v.forcePush}; deletes=${v.propagateDeletes}; every=${v.intervalMinutes}m; enabled=${v.enabled}`;
 }
 
 export async function GET() {
@@ -97,8 +95,8 @@ export async function PUT(req: NextRequest) {
   const r = await prepare(data, id);
   if ("error" in r) { await pruneUnusedRepositories(); return NextResponse.json({ error: r.error }, { status: 400 }); }
   // The remembered ref state only applies to the same route and scope; start fresh when they change.
-  const scopeChanged = (["sourceRepoId", "destRepoId", "direction", "branches", "syncTags", "mode"] as const).some(k => existing[k] !== r.values[k]);
-  await db.update(syncs).set({ ...r.values, ...(scopeChanged ? { refState: null } : {}) }).where(eq(syncs.id, id));
+  const scopeChanged = (["sourceRepoId", "destRepoId", "direction", "branches", "syncTags"] as const).some(k => existing[k] !== r.values[k]);
+  await db.update(syncs).set({ ...r.values, ...(scopeChanged ? { refState: null, verification: null } : {}) }).where(eq(syncs.id, id));
   await pruneUnusedRepositories();
   await logAudit({ userEmail: admin.email, action: "update", resource: "sync", detail: `id=${id}; ${await describe(r.values)}`, ip: clientIp(req) });
   return NextResponse.json({ ok: true });

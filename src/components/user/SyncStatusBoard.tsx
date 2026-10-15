@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { muted, sectionTitle } from "@/lib/ui-conventions";
 import { syncStatus, type SyncOverview, type SyncStatus } from "@/lib/sync-shared";
-import { RunHistoryList, SyncFacts, SyncRoute, SyncRow, type RunDetail } from "@/components/sync/SyncDisplay";
+import { RunHistoryList, SyncFacts, SyncRoute, SyncRow, VerificationPanel, type RunDetail } from "@/components/sync/SyncDisplay";
 import { cn } from "@/lib/utils";
 
 const SUMMARY: SyncStatus[] = ["success", "conflict", "failed", "running"];
@@ -23,7 +23,7 @@ export default function SyncStatusBoard() {
     setSelected({ sync, runs: d.runs ?? [] });
   }
 
-  const anyRunning = syncs?.some(s => s.running) ?? false;
+  const anyRunning = syncs?.some(s => s.running || s.verifying) ?? false;
   useEffect(() => {
     let live = true;
     const poll = () => fetch("/api/syncs")
@@ -69,6 +69,7 @@ export default function SyncStatusBoard() {
             <div className="flex flex-col gap-3">
               <SyncRoute sync={selected.sync} />
               <SyncFacts sync={selected.sync} />
+              <VerificationPanel verification={selected.sync.verification} verifying={selected.sync.verifying} />
               {selected.runs ? <RunHistoryList runs={selected.runs} /> : <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin" /></div>}
             </div>
           )}

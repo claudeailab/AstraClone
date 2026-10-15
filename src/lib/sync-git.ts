@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { access, mkdir } from "node:fs/promises";
 import path from "node:path";
-import type { FileChange, RefChange, SyncMode } from "./sync-shared";
+import type { FileChange, RefChange, RefDifference, Verification } from "./sync-shared";
 
 export interface Remote { url: string; token?: string; readOnly?: boolean }
 export interface SyncConfig {
@@ -9,7 +9,6 @@ export interface SyncConfig {
   branches: string;
   syncTags: boolean;
   forcePush: boolean;
-  mode: SyncMode;
   propagateDeletes: boolean;
 }
 /** Ref maps keyed "heads/<branch>" or "tags/<tag>" as observed after the previous run. */
@@ -133,24 +132,14 @@ async function push(dir: string, remote: Remote, refspecs: string[], onPercent?:
   }
 }
 
-interface Op { key: string; side: "src" | "dst"; sha: string | null; force: boolean; change: RefChange }
-
-export async function syncRepositories(
-  dir: string, sourceRemote: Remote, dest: Remote, cfg: SyncConfig, previous: RefState | null = null, onProgress: ProgressFn = () => {},
-): Promise<SyncResult> {
-  const twoWay = cfg.direction === "two_way";
-  // One-way syncs must never modify the source: it is only ever fetched from.
-  const source: Remote = { ...sourceRemote, readOnly: sourceRemote.readOnly || !twoWay };
-  if (source.url.toLowerCase() === dest.url.toLowerCase()) throw new Error("Source and destination are the same repository");
-
-  onProgress("Preparing", 2);
+/** Fetches both sides into the work repo and returns the in-scope ref maps. Read-only on both remotes. */
+async function fetchBoth(dir: string, source: Remote, dest: Remote, cfg: Pick<SyncConfig, "branches" | "syncTags">, onProgress: ProgressFn) {
   try {
     await access(path.join(dir, "HEAD"));
   } catch {
     await mkdir(dir, { recursive: true });
     await gitOk(dir, ["init", "--bare", "--quiet"]);
   }
-
   const refspecs = (side: string) => [
     `+refs/heads/*:refs/${side}/heads/*`,
     ...(cfg.syncTags ? [`+refs/tags/*:refs/${side}/tags/*`] : []),
@@ -170,8 +159,55 @@ export async function syncRepositories(
     if (cfg.syncTags) for (const [t, sha] of await listRefs(dir, `refs/${side}/tags`)) map[`tags/${t}`] = sha;
     return map;
   };
-  const S = await collect("src");
-  const D = await collect("dst");
+  return { S: await collect("src"), D: await collect("dst"), matches };
+}
+
+async function treeOf(dir: string, sha: string): Promise<string | null> {
+  const r = await git(dir, ["rev-parse", "--verify", "-q", `${sha}^{tree}`]);
+  return r.code === 0 ? r.stdout.trim() : null;
+}
+
+/**
+ * Proves whether the destination is an exact replica of the source for the sync's scope.
+ * Git commit/tag ids are hashes over the full content and history, so equal ids mean byte-identical files.
+ * When ids differ, equal tree ids still mean the files are identical (only the history differs).
+ * Never writes to either repository.
+ */
+export async function verifyRepositories(
+  dir: string, source: Remote, dest: Remote, cfg: Pick<SyncConfig, "direction" | "branches" | "syncTags">, onProgress: ProgressFn = () => {},
+): Promise<Verification> {
+  const { S, D } = await fetchBoth(dir, { ...source, readOnly: true }, { ...dest, readOnly: true }, cfg, onProgress);
+  onProgress("Verifying files", 85);
+  const keys = [...new Set([...Object.keys(S), ...Object.keys(D)])].sort();
+  const differences: RefDifference[] = [];
+  let branches = 0, tags = 0, identicalBranches = 0, identicalTags = 0, contentOnly = 0;
+  for (const k of keys) {
+    const kind = k.startsWith("heads/") ? "branch" : "tag";
+    const s = S[k] ?? null, d = D[k] ?? null;
+    if (kind === "branch") branches++; else tags++;
+    if (s && d && s === d) { if (kind === "branch") identicalBranches++; else identicalTags++; continue; }
+    const sameFiles = !!(s && d) && (await treeOf(dir, s)) === (await treeOf(dir, d));
+    if (sameFiles) contentOnly++;
+    differences.push({ ref: k.slice(kind === "branch" ? 6 : 5), kind, source: s, destination: d, sameFiles });
+  }
+  onProgress("Finishing", 99);
+  const status: Verification["status"] = !differences.length ? "identical" : differences.length === contentOnly ? "files_identical" : "different";
+  return { status, checkedAt: new Date().toISOString(), branches, identicalBranches, tags, identicalTags, differences };
+}
+
+interface Op { key: string; side: "src" | "dst"; sha: string | null; force: boolean; change: RefChange }
+
+export async function syncRepositories(
+  dir: string, sourceRemote: Remote, dest: Remote, cfg: SyncConfig, previous: RefState | null = null, onProgress: ProgressFn = () => {},
+): Promise<SyncResult> {
+  const twoWay = cfg.direction === "two_way";
+  // One-way syncs must never modify the source: it is only ever fetched from.
+  const source: Remote = { ...sourceRemote, readOnly: sourceRemote.readOnly || !twoWay };
+  if (source.url.toLowerCase() === dest.url.toLowerCase()) throw new Error("Source and destination are the same repository");
+
+  onProgress("Preparing", 2);
+  const { S, D, matches } = await fetchBoth(dir, source, dest, cfg, onProgress);
+
   const inScope = (k: string) => (k.startsWith("heads/") ? matches(k.slice(6)) : cfg.syncTags);
   const P: RefState | null = previous && {
     src: Object.fromEntries(Object.entries(previous.src).filter(([k]) => inScope(k))),
@@ -181,7 +217,6 @@ export async function syncRepositories(
   const ops: Op[] = [];
   const details: string[] = [];
   const conflicts: string[] = [];
-  const baseline = cfg.mode === "changes" && !P;
   const label = (k: string) => (k.startsWith("heads/") ? `branch ${k.slice(6)}` : `tag ${k.slice(5)}`);
   const conflict = (k: string, why: string) => { conflicts.push(k); details.push(`${label(k)}: CONFLICT — ${why}`); };
   const op = (k: string, side: "src" | "dst", sha: string | null, from: string | null, action: RefChange["action"]) => {
@@ -192,7 +227,7 @@ export async function syncRepositories(
   };
   const isBranch = (k: string) => k.startsWith("heads/");
 
-  if (!baseline) {
+  {
     const keys = new Set([...Object.keys(S), ...Object.keys(D), ...Object.keys(P?.src ?? {}), ...Object.keys(P?.dst ?? {})]);
     for (const k of [...keys].sort()) {
       const s = S[k], d = D[k], ps = P?.src[k], pd = P?.dst[k];
@@ -205,7 +240,6 @@ export async function syncRepositories(
           }
           continue;
         }
-        if (cfg.mode === "changes" && ps === s) continue;
         if (s === d) continue;
         if (!d) { op(k, "dst", s, null, "created"); continue; }
         if (isBranch(k) && await isAncestor(dir, d, s)) { op(k, "dst", s, d, "updated"); continue; }
@@ -226,12 +260,10 @@ export async function syncRepositories(
           else conflict(k, `deleted on ${missingSide === "src" ? "source" : "destination"} but changed on the other side — kept`);
           continue;
         }
-        if (cfg.mode === "changes" && presentBefore === present) continue;
         op(k, missingSide, present, null, "created");
         continue;
       }
       if (s === d) continue;
-      if (cfg.mode === "changes" && s === ps && d === pd) continue;
       if (isBranch(k) && await isAncestor(dir, d, s)) { op(k, "dst", s, d, "updated"); continue; }
       if (isBranch(k) && await isAncestor(dir, s, d)) { op(k, "src", d, s, "updated"); continue; }
       conflict(k, isBranch(k) ? "both sides have diverged" : "tag points to different commits on each side");
@@ -283,8 +315,7 @@ export async function syncRepositories(
   const branchCount = new Set([...Object.keys(S), ...(twoWay ? Object.keys(D) : [])].filter(isBranch)).size;
   const tagCount = new Set([...Object.keys(S), ...(twoWay ? Object.keys(D) : [])].filter(k => !isBranch(k))).size;
   const parts: string[] = [];
-  if (baseline) parts.push(`Starting point recorded (${branchCount} branch${branchCount === 1 ? "" : "es"}${cfg.syncTags ? `, ${tagCount} tag${tagCount === 1 ? "" : "s"}` : ""}) — changes from now on will be synced`);
-  else if (!ops.length && conflicts.length) parts.push("Nothing pushed");
+  if (!ops.length && conflicts.length) parts.push("Nothing pushed");
   else if (!ops.length) parts.push(`Up to date (${branchCount} branch${branchCount === 1 ? "" : "es"}${cfg.syncTags ? `, ${tagCount} tag${tagCount === 1 ? "" : "s"}` : ""})`);
   const count = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
   const pushed = ops.filter(o => o.sha);

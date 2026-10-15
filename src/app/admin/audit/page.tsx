@@ -91,7 +91,7 @@ function formatAuditEvent(action: string, resource: string, detail: string | nul
 
   const managed: Record<string, string> = { github_connection: "GitHub account", sync: "synchronization" };
   if (managed[resource]) {
-    const verb = { create: "Added", update: "Updated", delete: "Removed", run: "Manually ran" }[action] ?? action;
+    const verb = { create: "Added", update: "Updated", delete: "Removed", run: "Manually ran", verify: "Verified" }[action] ?? action;
     return `${verb} ${managed[resource]}${d ? `: ${d}` : ""}`;
   }
 
