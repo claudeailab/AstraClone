@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Loader2, Plus, Pencil, Trash2, KeyRound, Plug } from "lucide-react";
 import { pageWrapper, pageInner, pageTitle, muted } from "@/lib/ui-conventions";
 
-interface Account { id: number; name: string; username: string; repoCount: number }
+interface Account { id: number; name: string; username: string; syncCount: number }
 
 const emptyForm = { id: 0, name: "", token: "" };
 
@@ -98,7 +98,7 @@ export default function AccountsPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="flex items-center justify-between gap-2">
-                  <span className={muted}>{a.repoCount} repositor{a.repoCount === 1 ? "y" : "ies"}</span>
+                  <span className={muted}>Used by {a.syncCount} synchronization{a.syncCount === 1 ? "" : "s"}</span>
                   <Button size="sm" variant="outline" onClick={() => handleTest(a)} disabled={testing === a.id}>
                     {testing === a.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Plug className="h-4 w-4 mr-1" /> Test</>}
                   </Button>

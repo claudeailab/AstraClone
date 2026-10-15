@@ -15,29 +15,62 @@ import { pageWrapper, pageInner, pageTitle, muted } from "@/lib/ui-conventions";
 import { SYNC_DIRECTIONS, SYNC_INTERVALS, SYNC_MODES, intervalLabel, nextRunAt, relativeTime, routeLabel, type SyncDirection, type SyncMode, type SyncOverview } from "@/lib/sync-shared";
 import { RunHistoryDots, RunHistoryList, SyncFacts, SyncProgressBar, SyncRoute, SyncStatusBadge, type RunDetail } from "@/components/sync/SyncDisplay";
 
-interface Repo { id: number; owner: string; name: string; githubId: number | null; canPush: boolean; connectionName: string }
-
-function isSameRepo(a: Repo, b: Repo) {
-  if (a.githubId && b.githubId) return a.githubId === b.githubId;
-  return `${a.owner}/${a.name}`.toLowerCase() === `${b.owner}/${b.name}`.toLowerCase();
-}
+interface Account { id: number; name: string; username: string }
+interface AccountRepo { fullName: string; isPrivate: boolean; canPush: boolean }
+type RepoList = AccountRepo[] | "loading" | { error: string };
 
 const emptyForm = {
-  id: 0, sourceRepoId: "", destRepoId: "", direction: "one_way" as SyncDirection,
+  id: 0, sourceConnectionId: "", sourceRepo: "", destConnectionId: "", destRepo: "", direction: "one_way" as SyncDirection,
   branches: [] as string[], allBranches: true, syncTags: true, forcePush: false, mode: "full" as SyncMode, propagateDeletes: false, intervalMinutes: "15", enabled: true,
 };
 type SyncForm = typeof emptyForm;
 
-async function fetchBranches(repoId: string): Promise<string[]> {
-  const r = await fetch(`/api/admin/repositories/branches?id=${repoId}`);
+async function fetchBranches(connectionId: string, repo: string): Promise<string[]> {
+  const r = await fetch(`/api/admin/accounts/branches?id=${connectionId}&repo=${encodeURIComponent(repo)}`);
   const d = await r.json();
   if (!r.ok) throw new Error(d.error ?? "Could not load branches");
   return d.branches ?? [];
 }
 
+function RepoPicker({ label, accounts, connectionId, repo, list, excludeRepo, needsPush, onAccount, onRepo }: {
+  label: string; accounts: Account[]; connectionId: string; repo: string; list: RepoList | undefined;
+  excludeRepo?: string; needsPush: boolean; onAccount: (id: string) => void; onRepo: (repo: string) => void;
+}) {
+  const repos = Array.isArray(list) ? list : [];
+  const options = repo && !repos.some(r => r.fullName === repo) ? [{ fullName: repo, isPrivate: false, canPush: true }, ...repos] : repos;
+  const placeholder = !connectionId ? "Select an account first" : list === "loading" || list === undefined ? "Loading repositories…" : options.length ? "Select a repository" : "No repositories found";
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label>{label}</Label>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Select value={connectionId} onValueChange={onAccount}>
+          <SelectTrigger><SelectValue placeholder="GitHub account" /></SelectTrigger>
+          <SelectContent>{accounts.map(a => <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>)}</SelectContent>
+        </Select>
+        <Select value={repo} onValueChange={onRepo} disabled={!connectionId || !options.length}>
+          <SelectTrigger className="font-mono"><SelectValue placeholder={placeholder} /></SelectTrigger>
+          <SelectContent>
+            {options.map(r => {
+              const same = excludeRepo?.toLowerCase() === r.fullName.toLowerCase();
+              const readOnly = needsPush && !r.canPush;
+              return (
+                <SelectItem key={r.fullName} value={r.fullName} disabled={same || readOnly} className="font-mono">
+                  {r.fullName}{r.isPrivate ? " · private" : ""}{readOnly ? " · read only" : ""}{same ? " · same as source" : ""}
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
+      </div>
+      {list && typeof list === "object" && "error" in list && <p className="text-xs text-destructive">{list.error}</p>}
+    </div>
+  );
+}
+
 export default function SyncsPage() {
   const [syncs, setSyncs] = useState<SyncOverview[]>([]);
-  const [repos, setRepos] = useState<Repo[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [repoLists, setRepoLists] = useState<Record<string, RepoList>>({});
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<SyncOverview | null>(null);
@@ -49,10 +82,10 @@ export default function SyncsPage() {
 
   const load = useCallback(async () => {
     try {
-      const [sr, rr] = await Promise.all([fetch("/api/admin/syncs"), fetch("/api/admin/repositories")]);
-      const [sd, rd] = await Promise.all([sr.json(), rr.json()]);
+      const [sr, ar] = await Promise.all([fetch("/api/admin/syncs"), fetch("/api/admin/accounts")]);
+      const [sd, ad] = await Promise.all([sr.json(), ar.json()]);
       setSyncs(sd.syncs ?? []);
-      setRepos(rd.repositories ?? []);
+      setAccounts(ad.connections ?? []);
     } finally { setLoading(false); }
   }, []);
 
@@ -64,14 +97,22 @@ export default function SyncsPage() {
     return () => clearInterval(t);
   }, [load, anyRunning]);
 
+  async function loadRepos(connectionId: string) {
+    if (!connectionId || Array.isArray(repoLists[connectionId])) return;
+    setRepoLists(m => ({ ...m, [connectionId]: "loading" }));
+    const r = await fetch(`/api/admin/accounts/repos?id=${connectionId}`);
+    const d = await r.json();
+    setRepoLists(m => ({ ...m, [connectionId]: r.ok ? d.repos ?? [] : { error: d.error ?? "Could not load repositories" } }));
+  }
+
   async function loadBranches(f: SyncForm) {
     setBranchOptions(null);
     setBranchError(null);
-    if (!f.sourceRepoId || (f.direction === "two_way" && !f.destRepoId)) return;
+    if (!f.sourceRepo || (f.direction === "two_way" && !f.destRepo)) return;
     try {
       const lists = await Promise.all([
-        fetchBranches(f.sourceRepoId),
-        ...(f.direction === "two_way" ? [fetchBranches(f.destRepoId)] : []),
+        fetchBranches(f.sourceConnectionId, f.sourceRepo),
+        ...(f.direction === "two_way" ? [fetchBranches(f.destConnectionId, f.destRepo)] : []),
       ]);
       setBranchOptions([...new Set(lists.flat())].sort());
     } catch (e) {
@@ -83,19 +124,24 @@ export default function SyncsPage() {
   function update(patch: Partial<SyncForm>) {
     const next = { ...form, ...patch };
     setForm(next);
-    if ("sourceRepoId" in patch || "destRepoId" in patch || "direction" in patch) loadBranches(next);
+    if ("sourceConnectionId" in patch) loadRepos(next.sourceConnectionId);
+    if ("destConnectionId" in patch) loadRepos(next.destConnectionId);
+    if ("sourceRepo" in patch || "destRepo" in patch || "direction" in patch) loadBranches(next);
   }
 
   function openForm(next: SyncForm) {
     setForm(next);
     setDialogOpen(true);
+    loadRepos(next.sourceConnectionId);
+    loadRepos(next.destConnectionId);
     loadBranches(next);
   }
 
   function openEdit(s: SyncOverview) {
     const branches = s.branches.split(",").map(b => b.trim()).filter(Boolean);
     openForm({
-      id: s.id, sourceRepoId: String(s.sourceRepoId), destRepoId: String(s.destRepoId), direction: s.direction,
+      id: s.id, sourceConnectionId: String(s.sourceConnectionId), sourceRepo: s.source,
+      destConnectionId: String(s.destConnectionId), destRepo: s.destination, direction: s.direction,
       branches, allBranches: !branches.length, syncTags: s.syncTags, forcePush: s.forcePush, mode: s.mode, propagateDeletes: s.propagateDeletes, intervalMinutes: String(s.intervalMinutes), enabled: s.enabled,
     });
   }
@@ -109,7 +155,8 @@ export default function SyncsPage() {
     try {
       const body = {
         ...(form.id ? { id: form.id } : {}),
-        sourceRepoId: Number(form.sourceRepoId), destRepoId: Number(form.destRepoId), direction: form.direction,
+        sourceConnectionId: Number(form.sourceConnectionId), sourceRepo: form.sourceRepo,
+        destConnectionId: Number(form.destConnectionId), destRepo: form.destRepo, direction: form.direction,
         branches: form.allBranches ? "" : form.branches.join(", "), syncTags: form.syncTags, forcePush: form.forcePush, mode: form.mode, propagateDeletes: form.propagateDeletes, intervalMinutes: Number(form.intervalMinutes), enabled: form.enabled,
       };
       const r = await fetch("/api/admin/syncs", {
@@ -148,8 +195,8 @@ export default function SyncsPage() {
     load();
   }
 
-  const repoLabel = (r: Repo) => `${r.owner}/${r.name} · ${r.connectionName}${r.canPush ? "" : " (read only)"}`;
-  const formValid = form.sourceRepoId && form.destRepoId && form.sourceRepoId !== form.destRepoId
+  const single = accounts.length === 1 ? String(accounts[0].id) : "";
+  const formValid = form.sourceRepo && form.destRepo && form.sourceRepo.toLowerCase() !== form.destRepo.toLowerCase()
     && (form.allBranches || form.branches.length > 0);
   const intervalOptions = SYNC_INTERVALS.includes(Number(form.intervalMinutes)) ? SYNC_INTERVALS : [...SYNC_INTERVALS, Number(form.intervalMinutes)].sort((a, b) => a - b);
   const branchChoices = [...new Set([...(branchOptions ?? []), ...form.branches])].sort();
@@ -159,15 +206,15 @@ export default function SyncsPage() {
       <div className={pageInner}>
         <div className="flex items-center justify-between gap-4 mb-2">
           <h1 className={pageTitle}>Synchronizations</h1>
-          <Button size="sm" onClick={() => openForm(emptyForm)} disabled={repos.length < 2}><Plus className="h-4 w-4 mr-1" /> New Sync</Button>
+          <Button size="sm" onClick={() => openForm({ ...emptyForm, sourceConnectionId: single, destConnectionId: single })} disabled={!accounts.length}><Plus className="h-4 w-4 mr-1" /> New Sync</Button>
         </div>
         <p className={`${muted} mb-6`}>Choose what synchronizes where, in which direction and how often.</p>
 
         {loading ? (
           <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin" /></div>
-        ) : repos.length < 2 && !syncs.length ? (
+        ) : !accounts.length && !syncs.length ? (
           <p className={`text-center py-12 ${muted}`}>
-            Add at least two <Link href="/admin/repositories" className="text-primary underline-offset-4 hover:underline">repositories</Link> first.
+            Add a <Link href="/admin/accounts" className="text-primary underline-offset-4 hover:underline">GitHub account</Link> first.
           </p>
         ) : syncs.length === 0 ? (
           <p className={`text-center py-12 ${muted}`}>No synchronizations yet.</p>
@@ -215,22 +262,27 @@ export default function SyncsPage() {
           <DialogContent className="max-w-lg max-h-[90dvh] overflow-y-auto">
             <DialogHeader><DialogTitle>{form.id ? "Edit Synchronization" : "New Synchronization"}</DialogTitle></DialogHeader>
             <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <Label>Source</Label>
-                  <Select value={form.sourceRepoId} onValueChange={v => update({ sourceRepoId: v, branches: [] })}>
-                    <SelectTrigger><SelectValue placeholder="Select repository" /></SelectTrigger>
-                    <SelectContent>{repos.map(r => <SelectItem key={r.id} value={String(r.id)}>{repoLabel(r)}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label>Destination</Label>
-                  <Select value={form.destRepoId} onValueChange={v => update({ destRepoId: v })}>
-                    <SelectTrigger><SelectValue placeholder="Select repository" /></SelectTrigger>
-                    <SelectContent>{repos.filter(r => { const src = repos.find(x => String(x.id) === form.sourceRepoId); return !src || !isSameRepo(src, r); }).map(r => <SelectItem key={r.id} value={String(r.id)}>{repoLabel(r)}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-              </div>
+              <RepoPicker
+                label="Source"
+                accounts={accounts}
+                connectionId={form.sourceConnectionId}
+                repo={form.sourceRepo}
+                list={repoLists[form.sourceConnectionId]}
+                needsPush={form.direction === "two_way"}
+                onAccount={v => update({ sourceConnectionId: v, sourceRepo: "", branches: [] })}
+                onRepo={v => update({ sourceRepo: v, branches: [] })}
+              />
+              <RepoPicker
+                label="Destination"
+                accounts={accounts}
+                connectionId={form.destConnectionId}
+                repo={form.destRepo}
+                list={repoLists[form.destConnectionId]}
+                excludeRepo={form.sourceRepo}
+                needsPush
+                onAccount={v => update({ destConnectionId: v, destRepo: "" })}
+                onRepo={v => update({ destRepo: v })}
+              />
               <div className="flex flex-col gap-1.5">
                 <Label>Direction</Label>
                 <Select value={form.direction} onValueChange={v => update({ direction: v as SyncDirection })}>
@@ -256,7 +308,7 @@ export default function SyncsPage() {
                   <Switch checked={form.allBranches} onCheckedChange={v => setForm(f => ({ ...f, allBranches: v }))} />
                 </label>
                 {!form.allBranches && (
-                  !form.sourceRepoId ? (
+                  !form.sourceRepo ? (
                     <p className="text-xs text-muted-foreground">Select a source to choose branches.</p>
                   ) : branchOptions === null ? (
                     <div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />Loading branches…</div>

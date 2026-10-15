@@ -6,8 +6,7 @@ Keeps GitHub repositories in sync. Add GitHub accounts and repositories, define 
 
 ### Repository Synchronization
 - **GitHub Accounts** (`/admin/accounts`): paste a personal access token — the GitHub username is detected automatically; tokens are encrypted and verified on save ("Test" button)
-- **Repositories** (`/admin/repositories`): pick an account, then pick from the repositories that account can access — no typing; visibility and push permission are recorded
-- **Synchronizations** (`/admin/syncs`): everything is chosen from lists — source, destination, direction, branches (all, or a checklist loaded from GitHub), check interval, tags, enable/pause, optional force push (one-way only); "Run now" and full run history with per-branch details
+- **Synchronizations** (`/admin/syncs`): everything is chosen from lists — source and destination are each an account plus one of the repositories that account can access (access and push permission are verified on save), direction, branches (all, or a checklist loaded from GitHub), check interval, tags, enable/pause, optional force push (one-way only); "Run now" and full run history with per-branch details
 - **One-way**: the source is strictly read-only — it is only fetched from, and the engine refuses any push to it. New branches and tags are created on the destination and branches are fast-forwarded; if the destination has commits the source doesn't, the branch is reported as a conflict and left untouched (unless force push is on)
 - **Two-way**: whichever side is ahead is fast-forwarded into the other; new branches and tags are copied both ways; branches changed on both sides are reported as conflicts and never overwritten
 - **What to sync**: *Everything* (destination matches the source) or *Only changes from now on* (the first run records a starting point; afterwards only branches/tags that change are synced, existing differences are left alone)

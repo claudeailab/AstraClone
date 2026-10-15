@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Settings, Users, CreditCard, Mail, Bot, SlidersHorizontal, Menu, X, LogOut, Sparkles, Bell, ClipboardList, KeyRound, FolderGit2, RefreshCw } from "lucide-react";
+import { LayoutDashboard, Settings, Users, CreditCard, Mail, Bot, SlidersHorizontal, Menu, X, LogOut, Sparkles, Bell, ClipboardList, KeyRound, RefreshCw } from "lucide-react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { cn } from "@/lib/utils";
 import type { Features } from "@/lib/features";
@@ -34,7 +34,6 @@ export default function AdminSidebar({ user, features, platform }: Props) {
 
   const managementItems: NavItem[] = [
     { href: "/admin/accounts", label: "GitHub Accounts", icon: KeyRound },
-    { href: "/admin/repositories", label: "Repositories", icon: FolderGit2 },
     { href: "/admin/syncs", label: "Synchronizations", icon: RefreshCw },
   ];
 

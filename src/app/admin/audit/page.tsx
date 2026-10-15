@@ -89,7 +89,7 @@ function formatAuditEvent(action: string, resource: string, detail: string | nul
     if (action === "delete") return d ? `Removed notification device: ${d}` : "Removed notification device";
   }
 
-  const managed: Record<string, string> = { github_connection: "GitHub account", repository: "repository", sync: "synchronization" };
+  const managed: Record<string, string> = { github_connection: "GitHub account", sync: "synchronization" };
   if (managed[resource]) {
     const verb = { create: "Added", update: "Updated", delete: "Removed", run: "Manually ran" }[action] ?? action;
     return `${verb} ${managed[resource]}${d ? `: ${d}` : ""}`;

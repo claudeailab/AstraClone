@@ -1,11 +1,11 @@
 import os from "node:os";
 import path from "node:path";
 import { rm } from "node:fs/promises";
-import { and, desc, eq, inArray, lt } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, notInArray, sql } from "drizzle-orm";
 import { db } from "./db";
 import { github_connections, repositories, sync_runs, syncs } from "./db/schema";
 import { decrypt } from "./encryption";
-import { repoUrl } from "./github";
+import { inspectRepo, parseRepoRef, repoUrl } from "./github";
 import { syncRepositories, type RefState, type SyncResult } from "./sync-git";
 import type { SyncOverview, SyncProgress } from "./sync-shared";
 
@@ -144,9 +144,10 @@ export async function describeRoute(sourceRepoId: number, destRepoId: number, di
 export async function listSyncOverview(): Promise<SyncOverview[]> {
   const [rows, repos] = await Promise.all([
     db.select().from(syncs).orderBy(syncs.id),
-    db.select({ id: repositories.id, owner: repositories.owner, name: repositories.name }).from(repositories),
+    db.select({ id: repositories.id, connectionId: repositories.connectionId, owner: repositories.owner, name: repositories.name }).from(repositories),
   ]);
   const repoName = new Map(repos.map(r => [r.id, `${r.owner}/${r.name}`]));
+  const repoConn = new Map(repos.map(r => [r.id, r.connectionId]));
   const runs = await Promise.all(rows.map(s =>
     db.select({
       id: sync_runs.id, status: sync_runs.status, triggeredBy: sync_runs.triggeredBy,
@@ -155,8 +156,8 @@ export async function listSyncOverview(): Promise<SyncOverview[]> {
   ));
   return rows.map((s, i) => ({
     id: s.id,
-    sourceRepoId: s.sourceRepoId,
-    destRepoId: s.destRepoId,
+    sourceConnectionId: repoConn.get(s.sourceRepoId) ?? 0,
+    destConnectionId: repoConn.get(s.destRepoId) ?? 0,
     source: repoName.get(s.sourceRepoId) ?? "(deleted)",
     destination: repoName.get(s.destRepoId) ?? "(deleted)",
     direction: s.direction === "two_way" ? "two_way" : "one_way",
@@ -174,4 +175,39 @@ export async function listSyncOverview(): Promise<SyncOverview[]> {
     progress: progress.get(s.id) ?? null,
     recentRuns: runs[i].map(r => ({ ...r, startedAt: r.startedAt.toISOString(), finishedAt: r.finishedAt?.toISOString() ?? null })),
   }));
+}
+
+/** Verifies access with the account's token and returns the internal repository record, creating or refreshing it. */
+export async function resolveRepository(connectionId: number, fullName: string):
+  Promise<{ id: number; owner: string; name: string; githubId: number | null; canPush: boolean } | { error: string }> {
+  const ref = parseRepoRef(fullName);
+  if (!ref) return { error: `Invalid repository "${fullName}"` };
+  const [conn] = await db.select({ token: github_connections.token }).from(github_connections).where(eq(github_connections.id, connectionId)).limit(1);
+  if (!conn) return { error: "GitHub account not found" };
+  let token: string;
+  try { token = decrypt(conn.token); } catch { return { error: "Account token cannot be decrypted — re-enter it" }; }
+  const info = await inspectRepo(token, ref.owner, ref.name);
+  if (!info.ok) return { error: info.error };
+  const values = { connectionId, owner: ref.owner, name: ref.name, githubId: info.githubId, isPrivate: info.isPrivate, canPush: info.canPush, defaultBranch: info.defaultBranch };
+  const [existing] = await db.select({ id: repositories.id }).from(repositories).where(and(
+    eq(repositories.connectionId, connectionId),
+    sql`lower(${repositories.owner}) = ${ref.owner.toLowerCase()}`,
+    sql`lower(${repositories.name}) = ${ref.name.toLowerCase()}`,
+  )).limit(1);
+  let id: number;
+  if (existing) {
+    await db.update(repositories).set(values).where(eq(repositories.id, existing.id));
+    id = existing.id;
+  } else {
+    const [ins] = await db.insert(repositories).values(values);
+    id = ins.insertId;
+  }
+  return { id, owner: ref.owner, name: ref.name, githubId: info.githubId, canPush: info.canPush };
+}
+
+/** Repository records exist only for synchronizations; remove any no longer referenced. */
+export async function pruneUnusedRepositories() {
+  const used = await db.select({ src: syncs.sourceRepoId, dst: syncs.destRepoId }).from(syncs);
+  const ids = [...new Set(used.flatMap(u => [u.src, u.dst]))];
+  await db.delete(repositories).where(ids.length ? notInArray(repositories.id, ids) : undefined);
 }

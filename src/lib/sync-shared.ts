@@ -43,8 +43,8 @@ export interface SyncRunSummary { id: number; status: string; triggeredBy: strin
 
 export interface SyncOverview {
   id: number;
-  sourceRepoId: number;
-  destRepoId: number;
+  sourceConnectionId: number;
+  destConnectionId: number;
   source: string;
   destination: string;
   direction: SyncDirection;

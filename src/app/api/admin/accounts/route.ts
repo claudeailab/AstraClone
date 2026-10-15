@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { count, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { github_connections, repositories } from "@/lib/db/schema";
+import { github_connections, repositories, syncs } from "@/lib/db/schema";
+import { pruneUnusedRepositories } from "@/lib/sync-engine";
 import { encrypt } from "@/lib/encryption";
 import { verifyToken } from "@/lib/github";
 import { logAudit } from "@/lib/audit";
@@ -28,15 +29,28 @@ async function checkToken(token: string) {
   return { login: v.login };
 }
 
+/** Number of synchronizations using each account (as source or destination). */
+async function syncCounts() {
+  const [repos, rows] = await Promise.all([
+    db.select({ id: repositories.id, connectionId: repositories.connectionId }).from(repositories),
+    db.select({ id: syncs.id, src: syncs.sourceRepoId, dst: syncs.destRepoId }).from(syncs),
+  ]);
+  const conn = new Map(repos.map(r => [r.id, r.connectionId]));
+  const counts = new Map<number, number>();
+  for (const sync of rows) {
+    for (const c of new Set([conn.get(sync.src), conn.get(sync.dst)])) if (c) counts.set(c, (counts.get(c) ?? 0) + 1);
+  }
+  return counts;
+}
+
 export async function GET() {
   await requireAdmin();
-  const [list, usage] = await Promise.all([
+  const [list, counts] = await Promise.all([
     db.select({ id: github_connections.id, name: github_connections.name, username: github_connections.username, createdAt: github_connections.createdAt })
       .from(github_connections).orderBy(github_connections.name),
-    db.select({ connectionId: repositories.connectionId, n: count() }).from(repositories).groupBy(repositories.connectionId),
+    syncCounts(),
   ]);
-  const used = new Map(usage.map(u => [u.connectionId, Number(u.n)]));
-  return NextResponse.json({ connections: list.map(c => ({ ...c, repoCount: used.get(c.id) ?? 0 })) });
+  return NextResponse.json({ connections: list.map(c => ({ ...c, syncCount: counts.get(c.id) ?? 0 })) });
 }
 
 export async function POST(req: NextRequest) {
@@ -80,8 +94,9 @@ export async function DELETE(req: NextRequest) {
   const admin = await requireAdmin();
   const id = Number(new URL(req.url).searchParams.get("id"));
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
-  const [{ n }] = await db.select({ n: count() }).from(repositories).where(eq(repositories.connectionId, id));
-  if (Number(n)) return NextResponse.json({ error: `Used by ${n} repositor${Number(n) === 1 ? "y" : "ies"} — remove ${Number(n) === 1 ? "it" : "them"} first` }, { status: 409 });
+  const n = (await syncCounts()).get(id) ?? 0;
+  if (n) return NextResponse.json({ error: `Used by ${n} synchronization${n === 1 ? "" : "s"} — remove ${n === 1 ? "it" : "them"} first` }, { status: 409 });
+  await pruneUnusedRepositories();
   const [existing] = await db.select({ name: github_connections.name, username: github_connections.username })
     .from(github_connections).where(eq(github_connections.id, id)).limit(1);
   await db.delete(github_connections).where(eq(github_connections.id, id));
