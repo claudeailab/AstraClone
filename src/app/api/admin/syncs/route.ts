@@ -4,7 +4,7 @@ import { and, eq, inArray, ne } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { repositories, syncs } from "@/lib/db/schema";
-import { describeRoute, listSyncOverview, removeSyncWorkdirs } from "@/lib/sync-engine";
+import { describeRoute, listSyncOverview, removeSyncWorkdirs, sameRepository } from "@/lib/sync-engine";
 import { logAudit } from "@/lib/audit";
 
 const syncSchema = z.object({
@@ -31,11 +31,12 @@ async function validateRepos(s: SyncInput, excludeId?: number): Promise<string |
     ...(excludeId ? [ne(syncs.id, excludeId)] : []),
   )).limit(1);
   if (dupe.length) return "A synchronization between these repositories already exists";
-  const rows = await db.select({ id: repositories.id, owner: repositories.owner, name: repositories.name, canPush: repositories.canPush })
+  const rows = await db.select({ id: repositories.id, owner: repositories.owner, name: repositories.name, githubId: repositories.githubId, canPush: repositories.canPush })
     .from(repositories).where(inArray(repositories.id, [s.sourceRepoId, s.destRepoId]));
   const src = rows.find(r => r.id === s.sourceRepoId);
   const dst = rows.find(r => r.id === s.destRepoId);
   if (!src || !dst) return "Repository not found";
+  if (sameRepository(src, dst)) return "Source and destination are the same GitHub repository";
   if (!dst.canPush) return `The account for ${dst.owner}/${dst.name} has no push access`;
   if (s.direction === "two_way" && !src.canPush) return `Two-way sync needs push access to ${src.owner}/${src.name}`;
   return null;

@@ -29,14 +29,14 @@ async function resolve(connectionId: number, repo: string, excludeId?: number) {
   try { token = decrypt(conn.token); } catch { return { error: "Account token cannot be decrypted — re-enter it" }; }
   const info = await inspectRepo(token, ref.owner, ref.name);
   if (!info.ok) return { error: info.error };
-  return { values: { connectionId, owner: ref.owner, name: ref.name, isPrivate: info.isPrivate, canPush: info.canPush, defaultBranch: info.defaultBranch } };
+  return { values: { connectionId, owner: ref.owner, name: ref.name, githubId: info.githubId, isPrivate: info.isPrivate, canPush: info.canPush, defaultBranch: info.defaultBranch } };
 }
 
 export async function GET() {
   await requireAdmin();
   const list = await db.select({
     id: repositories.id, connectionId: repositories.connectionId, owner: repositories.owner, name: repositories.name,
-    isPrivate: repositories.isPrivate, canPush: repositories.canPush, defaultBranch: repositories.defaultBranch,
+    githubId: repositories.githubId, isPrivate: repositories.isPrivate, canPush: repositories.canPush, defaultBranch: repositories.defaultBranch,
     connectionName: github_connections.name, connectionUsername: github_connections.username,
   }).from(repositories).innerJoin(github_connections, eq(repositories.connectionId, github_connections.id))
     .orderBy(repositories.owner, repositories.name);

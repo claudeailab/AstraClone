@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { access, mkdir } from "node:fs/promises";
 import path from "node:path";
 
-export interface Remote { url: string; token?: string }
+export interface Remote { url: string; token?: string; readOnly?: boolean }
 export interface SyncConfig {
   direction: "one_way" | "two_way";
   branches: string;
@@ -75,12 +75,17 @@ function filterMap(map: Map<string, string>, keep: (k: string) => boolean) {
 }
 
 async function push(dir: string, remote: Remote, refspecs: string[]) {
+  if (remote.readOnly) throw new Error("Refused to write to a read-only repository");
   for (let i = 0; i < refspecs.length; i += PUSH_CHUNK) {
     await gitOk(dir, ["push", "--quiet", remote.url, ...refspecs.slice(i, i + PUSH_CHUNK)], remote.token);
   }
 }
 
-export async function syncRepositories(dir: string, source: Remote, dest: Remote, cfg: SyncConfig): Promise<SyncResult> {
+export async function syncRepositories(dir: string, sourceRemote: Remote, dest: Remote, cfg: SyncConfig): Promise<SyncResult> {
+  const twoWay = cfg.direction === "two_way";
+  // One-way syncs must never modify the source: it is only ever fetched from.
+  const source: Remote = { ...sourceRemote, readOnly: sourceRemote.readOnly || !twoWay };
+  if (source.url.toLowerCase() === dest.url.toLowerCase()) throw new Error("Source and destination are the same repository");
   try {
     await access(path.join(dir, "HEAD"));
   } catch {
@@ -103,7 +108,6 @@ export async function syncRepositories(dir: string, source: Remote, dest: Remote
   const toSource: string[] = [];
   const details: string[] = [];
   const conflicts: string[] = [];
-  const twoWay = cfg.direction === "two_way";
   const allowForce = !twoWay && cfg.forcePush;
 
   const names = twoWay ? new Set([...srcHeads.keys(), ...dstHeads.keys()]) : new Set(srcHeads.keys());
@@ -112,10 +116,13 @@ export async function syncRepositories(dir: string, source: Remote, dest: Remote
     const d = dstHeads.get(b);
     if (s === d) continue;
     const ref = `refs/heads/${b}`;
-    if (s && !d) { toDest.push(`${s}:${ref}`); details.push(`branch ${b}: created on destination`); continue; }
-    if (!s && d) { toSource.push(`${d}:${ref}`); details.push(`branch ${b}: created on source`); continue; }
-    if (await isAncestor(dir, d!, s!)) { toDest.push(`${s}:${ref}`); details.push(`branch ${b}: fast-forwarded destination`); continue; }
-    if (twoWay && await isAncestor(dir, s!, d!)) { toSource.push(`${d}:${ref}`); details.push(`branch ${b}: fast-forwarded source`); continue; }
+    if (!s) {
+      if (twoWay) { toSource.push(`${d}:${ref}`); details.push(`branch ${b}: created on source`); }
+      continue;
+    }
+    if (!d) { toDest.push(`${s}:${ref}`); details.push(`branch ${b}: created on destination`); continue; }
+    if (await isAncestor(dir, d, s)) { toDest.push(`${s}:${ref}`); details.push(`branch ${b}: fast-forwarded destination`); continue; }
+    if (twoWay && await isAncestor(dir, s, d)) { toSource.push(`${d}:${ref}`); details.push(`branch ${b}: fast-forwarded source`); continue; }
     if (allowForce) { toDest.push(`+${s}:${ref}`); details.push(`branch ${b}: force-updated destination`); continue; }
     conflicts.push(`branch ${b}`);
     details.push(`branch ${b}: CONFLICT — ${twoWay ? "both sides have diverged" : "destination has commits not in source"}`);

@@ -36,7 +36,7 @@ export async function verifyToken(token: string): Promise<{ ok: true; login: str
 }
 
 export async function inspectRepo(token: string, owner: string, name: string):
-  Promise<{ ok: true; isPrivate: boolean; canPush: boolean; defaultBranch: string | null } | { ok: false; error: string }> {
+  Promise<{ ok: true; githubId: number; isPrivate: boolean; canPush: boolean; defaultBranch: string | null } | { ok: false; error: string }> {
   try {
     const r = await gh(`/repos/${owner}/${name}`, token);
     if (r.status === 404) return { ok: false, error: `${owner}/${name} not found or not accessible with this account` };
@@ -44,7 +44,7 @@ export async function inspectRepo(token: string, owner: string, name: string):
     if (r.status === 403) return { ok: false, error: `Access to ${owner}/${name} was denied for this account` };
     if (!r.ok) return { ok: false, error: `GitHub returned ${r.status}` };
     const d = await r.json();
-    return { ok: true, isPrivate: !!d.private, canPush: !!d.permissions?.push, defaultBranch: d.default_branch ?? null };
+    return { ok: true, githubId: d.id, isPrivate: !!d.private, canPush: !!d.permissions?.push, defaultBranch: d.default_branch ?? null };
   } catch {
     return { ok: false, error: "Could not reach GitHub" };
   }

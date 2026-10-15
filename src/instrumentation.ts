@@ -102,6 +102,7 @@ export async function register() {
         \`connection_id\` int NOT NULL,
         \`owner\` varchar(100) NOT NULL,
         \`name\` varchar(100) NOT NULL,
+        \`github_id\` bigint NULL,
         \`is_private\` tinyint(1) NOT NULL DEFAULT 0,
         \`can_push\` tinyint(1) NOT NULL DEFAULT 0,
         \`default_branch\` varchar(255),
@@ -155,6 +156,7 @@ export async function register() {
       "ALTER TABLE `astraclone_push_subscriptions` ADD COLUMN `label` varchar(255)",
       "ALTER TABLE `astraclone_push_subscriptions` ADD COLUMN `enabled` boolean NOT NULL DEFAULT true",
       "ALTER TABLE `astraclone_syncs` DROP COLUMN `name`",
+      "ALTER TABLE `astraclone_repositories` ADD COLUMN `github_id` bigint NULL AFTER `name`",
       `UPDATE \`astraclone_permission_groups\` SET \`permissions\` = IF(\`permissions\` LIKE '%"administrator"%', '["administrator"]', '["user"]') WHERE \`permissions\` NOT IN ('["administrator"]', '["user"]')`,
     ];
     for (const sql of migrations) {

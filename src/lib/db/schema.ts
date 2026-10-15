@@ -1,4 +1,4 @@
-import { mysqlTable, varchar, text, timestamp, int, boolean, date } from "drizzle-orm/mysql-core";
+import { mysqlTable, varchar, text, timestamp, int, bigint, boolean, date } from "drizzle-orm/mysql-core";
 
 export const settings = mysqlTable("astraclone_settings", {
   key: varchar("key", { length: 255 }).primaryKey(),
@@ -96,6 +96,7 @@ export const repositories = mysqlTable("astraclone_repositories", {
   connectionId: int("connection_id").notNull().references(() => github_connections.id),
   owner: varchar("owner", { length: 100 }).notNull(),
   name: varchar("name", { length: 100 }).notNull(),
+  githubId: bigint("github_id", { mode: "number" }),
   isPrivate: boolean("is_private").notNull().default(false),
   canPush: boolean("can_push").notNull().default(false),
   defaultBranch: varchar("default_branch", { length: 255 }),

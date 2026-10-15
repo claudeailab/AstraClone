@@ -15,7 +15,12 @@ import { pageWrapper, pageInner, pageTitle, muted } from "@/lib/ui-conventions";
 import { SYNC_DIRECTIONS, SYNC_INTERVALS, intervalLabel, nextRunAt, relativeTime, routeLabel, type SyncDirection, type SyncOverview, type SyncRunSummary } from "@/lib/sync-shared";
 import { RunHistoryDots, RunHistoryList, SyncFacts, SyncRoute, SyncStatusBadge } from "@/components/sync/SyncDisplay";
 
-interface Repo { id: number; owner: string; name: string; canPush: boolean; connectionName: string }
+interface Repo { id: number; owner: string; name: string; githubId: number | null; canPush: boolean; connectionName: string }
+
+function isSameRepo(a: Repo, b: Repo) {
+  if (a.githubId && b.githubId) return a.githubId === b.githubId;
+  return `${a.owner}/${a.name}`.toLowerCase() === `${b.owner}/${b.name}`.toLowerCase();
+}
 
 const emptyForm = {
   id: 0, sourceRepoId: "", destRepoId: "", direction: "one_way" as SyncDirection,
@@ -222,7 +227,7 @@ export default function SyncsPage() {
                   <Label>Destination</Label>
                   <Select value={form.destRepoId} onValueChange={v => update({ destRepoId: v })}>
                     <SelectTrigger><SelectValue placeholder="Select repository" /></SelectTrigger>
-                    <SelectContent>{repos.filter(r => String(r.id) !== form.sourceRepoId).map(r => <SelectItem key={r.id} value={String(r.id)}>{repoLabel(r)}</SelectItem>)}</SelectContent>
+                    <SelectContent>{repos.filter(r => { const src = repos.find(x => String(x.id) === form.sourceRepoId); return !src || !isSameRepo(src, r); }).map(r => <SelectItem key={r.id} value={String(r.id)}>{repoLabel(r)}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
               </div>

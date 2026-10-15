@@ -23,15 +23,23 @@ function workdir(syncId: number) {
   return path.join(WORK_ROOT, String(syncId));
 }
 
+export function sameRepository(
+  a: { owner: string; name: string; githubId: number | null },
+  b: { owner: string; name: string; githubId: number | null },
+) {
+  if (a.githubId && b.githubId) return a.githubId === b.githubId;
+  return `${a.owner}/${a.name}`.toLowerCase() === `${b.owner}/${b.name}`.toLowerCase();
+}
+
 async function loadRemote(repoId: number) {
   const [row] = await db
-    .select({ owner: repositories.owner, name: repositories.name, token: github_connections.token })
+    .select({ owner: repositories.owner, name: repositories.name, githubId: repositories.githubId, token: github_connections.token })
     .from(repositories)
     .innerJoin(github_connections, eq(repositories.connectionId, github_connections.id))
     .where(eq(repositories.id, repoId))
     .limit(1);
   if (!row) throw new Error(`Repository #${repoId} no longer exists`);
-  return { url: repoUrl(row.owner, row.name), token: decrypt(row.token) };
+  return { repo: row, remote: { url: repoUrl(row.owner, row.name), token: decrypt(row.token) } };
 }
 
 export function isSyncRunning(id: number) {
@@ -53,7 +61,8 @@ export async function runSync(id: number, triggeredBy: "schedule" | "manual"): P
     runId = ins.insertId;
 
     const [source, dest] = await Promise.all([loadRemote(cfg.sourceRepoId), loadRemote(cfg.destRepoId)]);
-    result = await syncRepositories(workdir(id), source, dest, {
+    if (sameRepository(source.repo, dest.repo)) throw new Error("Source and destination are the same GitHub repository — sync refused");
+    result = await syncRepositories(workdir(id), source.remote, dest.remote, {
       direction: cfg.direction === "two_way" ? "two_way" : "one_way",
       branches: cfg.branches,
       syncTags: cfg.syncTags,

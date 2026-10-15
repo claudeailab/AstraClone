@@ -24,6 +24,10 @@ GitHub secret scanning on the MCP tools rejects any `ghp_…` token passed as a 
 
 `sync-git.ts` has no DB imports, so it can be exercised against local bare repos (`git init --bare`) with `node --experimental-strip-types`: use file paths as remote URLs and no token. Cover: empty repos, create, fast-forward, destination ahead (conflict vs force), two-way reverse fast-forward, diverged (conflict), branch filter, missing remote.
 
+## Proving one-way syncs never touch the source
+
+Any change to `sync-git.ts` must re-run the source-protection suite: snapshot `git for-each-ref` of the source bare repo (plus a count of files modified after `config`) before and after every one-way scenario — default with a diverged destination, force push, tags, branch filter, no tags — and require identical snapshots. Also assert: destination-only branches/tags are not copied back, a `readOnly` source refuses writes even in two-way, and source == destination is refused.
+
 ## Running the full app locally in CCR
 
 Start `dockerd` (sudo), run `mysql:8.4` via Docker, `npm run build`, then `npx next start -p 8030` with the `ASTRACLONE_DB_*`, `ASTRACLONE_ENCRYPTION_KEY`, `ASTRACLONE_ADMIN_*` env vars. Server-side `fetch` needs `NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt` in CCR (the proxy also injects its own GitHub auth, so any token string verifies as the proxy's identity). Never point a test sync at two different real repositories.
