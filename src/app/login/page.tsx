@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Loader2, AlertCircle } from "lucide-react";
+import Link from "next/link";
+import { Loader2, AlertCircle, ArrowRight, ShieldCheck, User } from "lucide-react";
 
 const ERROR_MESSAGES: Record<string, string> = {
   auth_failed: "Authentication failed. Please try again.",
@@ -84,6 +85,16 @@ function LoginForm({ platformName }: { platformName: string }) {
 function LoginPageInner() {
   const [platformName, setPlatformName] = useState("Platform");
   const [iconUrl, setIconUrl] = useState("");
+  const [sessions, setSessions] = useState<{ admin: { name: string } | null; user: { name: string } | null }>({ admin: null, user: null });
+
+  useEffect(() => {
+    fetch("/api/auth/sessions").then(r => r.json()).then(setSessions).catch(() => {});
+  }, []);
+
+  const active = [
+    sessions.admin && { href: "/admin", label: "Administrator", name: sessions.admin.name, icon: ShieldCheck },
+    sessions.user && { href: "/user", label: "User", name: sessions.user.name, icon: User },
+  ].filter(Boolean) as { href: string; label: string; name: string; icon: React.ElementType }[];
 
   useEffect(() => {
     fetch("/api/platform").then(r => r.json()).then(d => {
@@ -99,13 +110,30 @@ function LoginPageInner() {
           {iconUrl && (
             <div className="flex justify-center mb-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={iconUrl} alt="" className="h-10 w-10" />
+              <img src={iconUrl} alt="" className="h-10 w-10" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
             </div>
           )}
           <CardTitle className="text-2xl">{platformName}</CardTitle>
-          <CardDescription>Sign in to your account</CardDescription>
+          <CardDescription>{active.length ? "Continue, or sign in with another account" : "Sign in to your account"}</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col gap-4">
+          {active.length > 0 && (
+            <div className="flex flex-col gap-2">
+              {active.map(s => (
+                <Link key={s.href} href={s.href} className="flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm transition-colors hover:bg-secondary">
+                  <s.icon className="h-4 w-4 shrink-0 text-primary" />
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate font-medium">{s.name}</span>
+                    <span className="text-xs text-muted-foreground">Signed in · {s.label}</span>
+                  </span>
+                  <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                </Link>
+              ))}
+              <div className="flex items-center gap-3 pt-1 text-xs text-muted-foreground">
+                <span className="h-px flex-1 bg-border" />or sign in<span className="h-px flex-1 bg-border" />
+              </div>
+            </div>
+          )}
           <Suspense fallback={<div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin" /></div>}>
             <LoginForm platformName={platformName} />
           </Suspense>

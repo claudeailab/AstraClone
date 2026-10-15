@@ -1,8 +1,6 @@
 import { redirect } from "next/navigation";
-import { getAdmin, getUser } from "@/lib/auth";
 
-export default async function HomePage() {
-  if (await getAdmin()) redirect("/admin");
-  if (await getUser()) redirect("/user");
+// The login page lists any active admin/user sessions, so it is always the entry point.
+export default function HomePage() {
   redirect("/login");
 }

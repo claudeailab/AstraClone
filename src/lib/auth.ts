@@ -61,6 +61,12 @@ export async function getUser() {
   return (await getAreaUser("user")) ?? (await getAreaUser("admin"));
 }
 
+/** Both independent sessions in this browser (each area's own cookie only). */
+export async function getSignedInSessions() {
+  const [admin, user] = await Promise.all([getAreaUser("admin"), getAreaUser("user")]);
+  return { admin, user };
+}
+
 export async function getAdmin() {
   return getAreaUser("admin");
 }
