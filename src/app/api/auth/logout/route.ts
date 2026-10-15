@@ -6,7 +6,7 @@ import { getBaseUrl } from "@/lib/base-url";
 async function logout(req: NextRequest) {
   const area = new URL(req.url).searchParams.get("area");
   const areas: SessionArea[] = area === "admin" || area === "user" ? [area] : ["admin", "user"];
-  const res = NextResponse.redirect(`${getBaseUrl(req)}/login`);
+  const res = NextResponse.redirect(`${getBaseUrl(req)}/`);
   for (const a of areas) {
     const name = sessionCookieName(a);
     const token = req.cookies.get(name)?.value;

@@ -113,7 +113,7 @@ Always prefer `mcp__github__*` tools over curl for GitHub API calls — the MCP 
 
 - Two independent session cookies (`SECURITY_CONVENTIONS.sessionCookies`): `astraclone-admin-session` and `astraclone-user-session`, so an administrator and a user can be signed in side by side in one browser. Login and Azure SSO pick the cookie from the account's role via `setSessionCookie()`.
 - `getAdmin()`/`requireAdmin()` read only the admin cookie; `getUser()`/`requireSession()`/`requireUserArea()` read the user cookie, falling back to the admin cookie (admins may view `/user`). A session is rejected if the account is disabled or its role no longer matches the cookie's area.
-- Logout is per area: `/api/auth/logout?area=admin|user` (no area = both). `/` always redirects to `/login`; the login page lists active sessions from `/api/auth/sessions` (each area's own cookie only) as "continue" links above the sign-in form, so a second account can always sign in while the first stays signed in. Never auto-redirect away from `/login` based on an existing session.
+- Logout is per area: `/api/auth/logout?area=admin|user` (no area = both). `/` is a public homepage (platform logo, name, title, "Log in" button → `/login`). Login redirects by role: administrators → `/admin`, users → `/user` (`homeForRole`). Logout returns to `/`. The login page never auto-redirects based on an existing session, so another account can always sign in.
 
 ## List layouts
 
