@@ -102,3 +102,9 @@ Always prefer `mcp__github__*` tools over curl for GitHub API calls — the MCP 
 - `roleFromPermissions()` is the only parser; `homeForRole()` decides post-login redirects (local login and Azure SSO). No role → login refused (403 / `no_access`).
 - Guards: `requireAdmin()` for admin pages/APIs, `requireUserArea()` for the user area (admins may view it too).
 - Startup normalizes any legacy group permissions to one of the two roles.
+
+## Sync state, modes, deletions, progress
+
+- `syncs.ref_state` (JSON `{src, dst}` of `heads/<b>`/`tags/<t>` → sha after the last run) drives `mode: "changes"` (only refs that moved since the last run; first run = baseline, nothing pushed) and `propagateDeletes` (a ref in the previous state but gone now is deleted on the other side only if that side still equals the previous source sha; `forcePush` overrides in one-way). Conflicted refs keep their previous state so they are retried. State is reset (NULL) when source, destination, direction, branches, tags or mode change.
+- `sync_runs.changes` (JSON `RefChange[]`, ≤1000 files per ref) + `files_changed`; new branches list files vs the merge-base with the other side's default branch. Served to admins and users via `/api/syncs/runs?id=`.
+- Progress: `syncRepositories(..., onProgress)` reports stage + percent (git `--progress` parsed from stderr via `spawn`); kept in memory in `sync-engine.ts` and returned as `SyncOverview.progress` while running; UI polls every 3s while anything runs.

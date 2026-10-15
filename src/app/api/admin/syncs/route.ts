@@ -14,6 +14,8 @@ const syncSchema = z.object({
   branches: z.string().trim().max(1000).regex(/^[A-Za-z0-9._/*,\s-]*$/, "Branches may only contain names, * wildcards and commas"),
   syncTags: z.boolean(),
   forcePush: z.boolean(),
+  mode: z.enum(["full", "changes"]),
+  propagateDeletes: z.boolean(),
   intervalMinutes: z.number().int().min(1).max(1440),
   enabled: z.boolean(),
 }).refine(s => s.sourceRepoId !== s.destRepoId, { message: "Source and destination must be different repositories" });
@@ -48,7 +50,7 @@ function values(s: SyncInput) {
 }
 
 async function describe(s: SyncInput) {
-  return `route=${await describeRoute(s.sourceRepoId, s.destRepoId, s.direction)}; direction=${s.direction}; branches=${s.branches || "all"}; tags=${s.syncTags}; force=${s.direction === "one_way" && s.forcePush}; every=${s.intervalMinutes}m; enabled=${s.enabled}`;
+  return `route=${await describeRoute(s.sourceRepoId, s.destRepoId, s.direction)}; direction=${s.direction}; branches=${s.branches || "all"}; tags=${s.syncTags}; force=${s.direction === "one_way" && s.forcePush}; mode=${s.mode}; deletes=${s.propagateDeletes}; every=${s.intervalMinutes}m; enabled=${s.enabled}`;
 }
 
 function firstIssue(err: z.ZodError) {
@@ -76,11 +78,14 @@ export async function PUT(req: NextRequest) {
   const parsed = updateSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: firstIssue(parsed.error) }, { status: 400 });
   const { id, ...data } = parsed.data;
-  const [existing] = await db.select({ id: syncs.id }).from(syncs).where(eq(syncs.id, id)).limit(1);
+  const [existing] = await db.select().from(syncs).where(eq(syncs.id, id)).limit(1);
   if (!existing) return NextResponse.json({ error: "Synchronization not found" }, { status: 404 });
   const problem = await validateRepos(data, id);
   if (problem) return NextResponse.json({ error: problem }, { status: 400 });
-  await db.update(syncs).set(values(data)).where(eq(syncs.id, id));
+  const next = values(data);
+  // The remembered ref state only applies to the same route and scope; start fresh when they change.
+  const scopeChanged = (["sourceRepoId", "destRepoId", "direction", "branches", "syncTags", "mode"] as const).some(k => existing[k] !== next[k]);
+  await db.update(syncs).set({ ...next, ...(scopeChanged ? { refState: null } : {}) }).where(eq(syncs.id, id));
   await logAudit({ userEmail: admin.email, action: "update", resource: "sync", detail: `id=${id}; ${await describe(data)}`, ip: clientIp(req) });
   return NextResponse.json({ ok: true });
 }

@@ -12,8 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Plus, Pencil, Trash2, Play, History, PauseCircle, Check } from "lucide-react";
 import { pageWrapper, pageInner, pageTitle, muted } from "@/lib/ui-conventions";
-import { SYNC_DIRECTIONS, SYNC_INTERVALS, intervalLabel, nextRunAt, relativeTime, routeLabel, type SyncDirection, type SyncOverview, type SyncRunSummary } from "@/lib/sync-shared";
-import { RunHistoryDots, RunHistoryList, SyncFacts, SyncRoute, SyncStatusBadge } from "@/components/sync/SyncDisplay";
+import { SYNC_DIRECTIONS, SYNC_INTERVALS, SYNC_MODES, intervalLabel, nextRunAt, relativeTime, routeLabel, type SyncDirection, type SyncMode, type SyncOverview } from "@/lib/sync-shared";
+import { RunHistoryDots, RunHistoryList, SyncFacts, SyncProgressBar, SyncRoute, SyncStatusBadge, type RunDetail } from "@/components/sync/SyncDisplay";
 
 interface Repo { id: number; owner: string; name: string; githubId: number | null; canPush: boolean; connectionName: string }
 
@@ -24,7 +24,7 @@ function isSameRepo(a: Repo, b: Repo) {
 
 const emptyForm = {
   id: 0, sourceRepoId: "", destRepoId: "", direction: "one_way" as SyncDirection,
-  branches: [] as string[], allBranches: true, syncTags: true, forcePush: false, intervalMinutes: "15", enabled: true,
+  branches: [] as string[], allBranches: true, syncTags: true, forcePush: false, mode: "full" as SyncMode, propagateDeletes: false, intervalMinutes: "15", enabled: true,
 };
 type SyncForm = typeof emptyForm;
 
@@ -41,7 +41,7 @@ export default function SyncsPage() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<SyncOverview | null>(null);
-  const [history, setHistory] = useState<{ sync: SyncOverview; runs: (SyncRunSummary & { details: string | null })[] | null } | null>(null);
+  const [history, setHistory] = useState<{ sync: SyncOverview; runs: RunDetail[] | null } | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [branchOptions, setBranchOptions] = useState<string[] | null>(null);
@@ -96,7 +96,7 @@ export default function SyncsPage() {
     const branches = s.branches.split(",").map(b => b.trim()).filter(Boolean);
     openForm({
       id: s.id, sourceRepoId: String(s.sourceRepoId), destRepoId: String(s.destRepoId), direction: s.direction,
-      branches, allBranches: !branches.length, syncTags: s.syncTags, forcePush: s.forcePush, intervalMinutes: String(s.intervalMinutes), enabled: s.enabled,
+      branches, allBranches: !branches.length, syncTags: s.syncTags, forcePush: s.forcePush, mode: s.mode, propagateDeletes: s.propagateDeletes, intervalMinutes: String(s.intervalMinutes), enabled: s.enabled,
     });
   }
 
@@ -110,7 +110,7 @@ export default function SyncsPage() {
       const body = {
         ...(form.id ? { id: form.id } : {}),
         sourceRepoId: Number(form.sourceRepoId), destRepoId: Number(form.destRepoId), direction: form.direction,
-        branches: form.allBranches ? "" : form.branches.join(", "), syncTags: form.syncTags, forcePush: form.forcePush, intervalMinutes: Number(form.intervalMinutes), enabled: form.enabled,
+        branches: form.allBranches ? "" : form.branches.join(", "), syncTags: form.syncTags, forcePush: form.forcePush, mode: form.mode, propagateDeletes: form.propagateDeletes, intervalMinutes: Number(form.intervalMinutes), enabled: form.enabled,
       };
       const r = await fetch("/api/admin/syncs", {
         method: form.id ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
@@ -135,7 +135,7 @@ export default function SyncsPage() {
 
   async function openHistory(s: SyncOverview) {
     setHistory({ sync: s, runs: null });
-    const r = await fetch(`/api/admin/syncs/runs?id=${s.id}`);
+    const r = await fetch(`/api/syncs/runs?id=${s.id}`);
     const d = await r.json();
     setHistory({ sync: s, runs: d.runs ?? [] });
   }
@@ -190,7 +190,7 @@ export default function SyncsPage() {
                 </CardHeader>
                 <CardContent className="flex flex-col gap-3">
                   <SyncFacts sync={s} />
-                  {s.lastMessage && <p className="text-sm break-words">{s.lastMessage}</p>}
+                  {s.running ? <SyncProgressBar progress={s.progress} /> : s.lastMessage && <p className="text-sm break-words">{s.lastMessage}</p>}
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex flex-col gap-1.5">
                       <span className="text-xs text-muted-foreground">
@@ -288,7 +288,27 @@ export default function SyncsPage() {
                   )
                 )}
               </div>
+              <div className="flex flex-col gap-1.5">
+                <Label>What to sync</Label>
+                <Select value={form.mode} onValueChange={v => setForm(f => ({ ...f, mode: v as SyncMode }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{SYNC_MODES.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">{SYNC_MODES.find(m => m.value === form.mode)?.description}</p>
+              </div>
               <div className="flex flex-col gap-3 rounded-lg border p-3">
+                <label className="flex items-center justify-between gap-4">
+                  <span className="flex flex-col">
+                    <span className="text-sm">{form.direction === "one_way" ? "Delete in destination when deleted in source" : "Mirror deletions both ways"}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {form.direction === "one_way"
+                        ? "Branches and tags removed from the source are removed from the destination — only if the destination has no other commits on them."
+                        : "A branch or tag deleted on one side is deleted on the other — only if the other side hasn't changed it."}
+                      {" "}Deleted files always follow their commits.
+                    </span>
+                  </span>
+                  <Switch checked={form.propagateDeletes} onCheckedChange={v => setForm(f => ({ ...f, propagateDeletes: v }))} />
+                </label>
                 <label className="flex items-center justify-between gap-4">
                   <span className="text-sm">Synchronize tags</span>
                   <Switch checked={form.syncTags} onCheckedChange={v => setForm(f => ({ ...f, syncTags: v }))} />
@@ -297,7 +317,7 @@ export default function SyncsPage() {
                   <label className="flex items-center justify-between gap-4">
                     <span className="flex flex-col">
                       <span className="text-sm">Force push</span>
-                      <span className="text-xs text-muted-foreground">Overwrite destination changes that are not in the source</span>
+                      <span className="text-xs text-muted-foreground">Overwrite destination changes that are not in the source (the source is never modified)</span>
                     </span>
                     <Switch checked={form.forcePush} onCheckedChange={v => setForm(f => ({ ...f, forcePush: v }))} />
                   </label>

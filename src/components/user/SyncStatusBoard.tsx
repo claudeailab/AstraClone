@@ -8,14 +8,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { muted, sectionTitle } from "@/lib/ui-conventions";
 import { nextRunAt, relativeTime, syncStatus, type SyncOverview, type SyncStatus } from "@/lib/sync-shared";
-import { RunHistoryDots, RunHistoryList, SyncFacts, SyncRoute, SyncStatusBadge } from "@/components/sync/SyncDisplay";
+import { RunHistoryDots, RunHistoryList, SyncFacts, SyncProgressBar, SyncRoute, SyncStatusBadge, type RunDetail } from "@/components/sync/SyncDisplay";
 import { cn } from "@/lib/utils";
 
 const SUMMARY: SyncStatus[] = ["success", "conflict", "failed", "running"];
 
 export default function SyncStatusBoard() {
   const [syncs, setSyncs] = useState<SyncOverview[] | null>(null);
-  const [selected, setSelected] = useState<SyncOverview | null>(null);
+  const [selected, setSelected] = useState<{ sync: SyncOverview; runs: RunDetail[] | null } | null>(null);
+
+  async function openDetails(sync: SyncOverview) {
+    setSelected({ sync, runs: null });
+    const r = await fetch(`/api/syncs/runs?id=${sync.id}`);
+    const d = r.ok ? await r.json() : { runs: [] };
+    setSelected({ sync, runs: d.runs ?? [] });
+  }
 
   const anyRunning = syncs?.some(s => s.running) ?? false;
   useEffect(() => {
@@ -61,7 +68,7 @@ export default function SyncStatusBoard() {
               </CardHeader>
               <CardContent className="flex flex-col gap-3">
                 <SyncFacts sync={s} />
-                {s.lastMessage && <p className="text-sm break-words">{s.lastMessage}</p>}
+                {s.running ? <SyncProgressBar progress={s.progress} /> : s.lastMessage && <p className="text-sm break-words">{s.lastMessage}</p>}
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex flex-col gap-1.5">
                     <span className="text-xs text-muted-foreground">
@@ -69,7 +76,7 @@ export default function SyncStatusBoard() {
                     </span>
                     <RunHistoryDots runs={s.recentRuns} />
                   </div>
-                  <Button size="sm" variant="outline" onClick={() => setSelected(s)}>Details</Button>
+                  <Button size="sm" variant="outline" onClick={() => openDetails(s)}>Details</Button>
                 </div>
               </CardContent>
             </Card>
@@ -82,9 +89,9 @@ export default function SyncStatusBoard() {
           <DialogHeader><DialogTitle>Synchronization details</DialogTitle></DialogHeader>
           {selected && (
             <div className="flex flex-col gap-3">
-              <SyncRoute sync={selected} />
-              <SyncFacts sync={selected} />
-              <RunHistoryList runs={selected.recentRuns} />
+              <SyncRoute sync={selected.sync} />
+              <SyncFacts sync={selected.sync} />
+              {selected.runs ? <RunHistoryList runs={selected.runs} /> : <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin" /></div>}
             </div>
           )}
         </DialogContent>

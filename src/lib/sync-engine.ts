@@ -6,13 +6,14 @@ import { db } from "./db";
 import { github_connections, repositories, sync_runs, syncs } from "./db/schema";
 import { decrypt } from "./encryption";
 import { repoUrl } from "./github";
-import { syncRepositories, type SyncResult } from "./sync-git";
-import type { SyncOverview } from "./sync-shared";
+import { syncRepositories, type RefState, type SyncResult } from "./sync-git";
+import type { SyncOverview, SyncProgress } from "./sync-shared";
 
 const WORK_ROOT = path.join(os.tmpdir(), "astraclone-sync");
 const KEEP_RUNS = 50;
 const TICK_MS = 60_000;
 const active = new Set<number>();
+const progress = new Map<number, SyncProgress>();
 let ticking = false;
 
 declare global {
@@ -62,21 +63,32 @@ export async function runSync(id: number, triggeredBy: "schedule" | "manual"): P
 
     const [source, dest] = await Promise.all([loadRemote(cfg.sourceRepoId), loadRemote(cfg.destRepoId)]);
     if (sameRepository(source.repo, dest.repo)) throw new Error("Source and destination are the same GitHub repository — sync refused");
+    let previous: RefState | null = null;
+    try { previous = cfg.refState ? JSON.parse(cfg.refState) as RefState : null; } catch { previous = null; }
     result = await syncRepositories(workdir(id), source.remote, dest.remote, {
       direction: cfg.direction === "two_way" ? "two_way" : "one_way",
       branches: cfg.branches,
       syncTags: cfg.syncTags,
       forcePush: cfg.forcePush,
-    });
+      mode: cfg.mode === "changes" ? "changes" : "full",
+      propagateDeletes: cfg.propagateDeletes,
+    }, previous, (stage, percent) => progress.set(id, { stage, percent: Math.min(100, Math.round(percent)) }));
   } catch (err) {
-    result = { status: "failed", message: err instanceof Error ? err.message : String(err), details: [] };
+    result = { status: "failed", message: err instanceof Error ? err.message : String(err), details: [], changes: [], filesChanged: 0, state: null };
   }
 
   try {
-    await db.update(syncs).set({ lastStatus: result.status, lastMessage: result.message }).where(eq(syncs.id, id));
+    await db.update(syncs).set({
+      lastStatus: result.status,
+      lastMessage: result.message,
+      ...(result.state ? { refState: JSON.stringify(result.state) } : {}),
+    }).where(eq(syncs.id, id));
     if (runId) {
       await db.update(sync_runs)
-        .set({ status: result.status, message: result.message, details: result.details.join("\n"), finishedAt: new Date() })
+        .set({
+          status: result.status, message: result.message, details: result.details.join("\n"),
+          changes: result.changes.length ? JSON.stringify(result.changes) : null, filesChanged: result.filesChanged, finishedAt: new Date(),
+        })
         .where(eq(sync_runs.id, runId));
       const [cutoff] = await db.select({ id: sync_runs.id }).from(sync_runs)
         .where(eq(sync_runs.syncId, id)).orderBy(desc(sync_runs.id)).limit(1).offset(KEEP_RUNS - 1);
@@ -85,6 +97,7 @@ export async function runSync(id: number, triggeredBy: "schedule" | "manual"): P
     if (result.status === "failed") console.error(`[Sync] #${id} failed: ${result.message}`);
   } finally {
     active.delete(id);
+    progress.delete(id);
   }
   return true;
 }
@@ -137,7 +150,7 @@ export async function listSyncOverview(): Promise<SyncOverview[]> {
   const runs = await Promise.all(rows.map(s =>
     db.select({
       id: sync_runs.id, status: sync_runs.status, triggeredBy: sync_runs.triggeredBy,
-      message: sync_runs.message, startedAt: sync_runs.startedAt, finishedAt: sync_runs.finishedAt,
+      message: sync_runs.message, filesChanged: sync_runs.filesChanged, startedAt: sync_runs.startedAt, finishedAt: sync_runs.finishedAt,
     }).from(sync_runs).where(eq(sync_runs.syncId, s.id)).orderBy(desc(sync_runs.id)).limit(RECENT_RUNS)
   ));
   return rows.map((s, i) => ({
@@ -150,12 +163,15 @@ export async function listSyncOverview(): Promise<SyncOverview[]> {
     branches: s.branches,
     syncTags: s.syncTags,
     forcePush: s.forcePush,
+    mode: s.mode === "changes" ? "changes" : "full",
+    propagateDeletes: s.propagateDeletes,
     intervalMinutes: s.intervalMinutes,
     enabled: s.enabled,
     lastStatus: active.has(s.id) ? "running" : s.lastStatus,
     lastMessage: s.lastMessage,
     lastRunAt: s.lastRunAt?.toISOString() ?? null,
     running: active.has(s.id),
+    progress: progress.get(s.id) ?? null,
     recentRuns: runs[i].map(r => ({ ...r, startedAt: r.startedAt.toISOString(), finishedAt: r.finishedAt?.toISOString() ?? null })),
   }));
 }

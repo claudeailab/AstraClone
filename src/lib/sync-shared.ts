@@ -39,7 +39,7 @@ export function relativeTime(iso: string | null): string {
   return diff >= 0 ? "just now" : "in <1m";
 }
 
-export interface SyncRunSummary { id: number; status: string; triggeredBy: string; message: string | null; startedAt: string; finishedAt: string | null }
+export interface SyncRunSummary { id: number; status: string; triggeredBy: string; message: string | null; filesChanged: number; startedAt: string; finishedAt: string | null }
 
 export interface SyncOverview {
   id: number;
@@ -51,12 +51,15 @@ export interface SyncOverview {
   branches: string;
   syncTags: boolean;
   forcePush: boolean;
+  mode: SyncMode;
+  propagateDeletes: boolean;
   intervalMinutes: number;
   enabled: boolean;
   lastStatus: string;
   lastMessage: string | null;
   lastRunAt: string | null;
   running: boolean;
+  progress: SyncProgress | null;
   recentRuns: SyncRunSummary[];
 }
 
@@ -69,3 +72,31 @@ export function nextRunAt(s: Pick<SyncOverview, "enabled" | "lastRunAt" | "inter
   if (!s.lastRunAt) return new Date().toISOString();
   return new Date(new Date(s.lastRunAt).getTime() + s.intervalMinutes * 60_000).toISOString();
 }
+
+export const SYNC_MODES = [
+  { value: "full", label: "Everything", description: "Make the destination match the source for the selected branches and tags." },
+  { value: "changes", label: "Only changes from now on", description: "The first run records a starting point. After that, only branches and tags that change are synced; existing differences are left alone." },
+] as const;
+export type SyncMode = typeof SYNC_MODES[number]["value"];
+
+export interface FileChange { status: string; path: string; from?: string }
+export interface RefChange {
+  ref: string;
+  kind: "branch" | "tag";
+  target: "destination" | "source";
+  action: "created" | "updated" | "forced" | "deleted";
+  from: string | null;
+  to: string | null;
+  files: FileChange[];
+  filesTruncated: number;
+}
+export interface SyncProgress { stage: string; percent: number }
+
+export const FILE_STATUS: Record<string, { label: string; className: string }> = {
+  A: { label: "Added", className: "text-emerald-700 dark:text-emerald-400" },
+  M: { label: "Modified", className: "text-primary" },
+  D: { label: "Deleted", className: "text-destructive" },
+  R: { label: "Renamed", className: "text-amber-700 dark:text-amber-400" },
+  C: { label: "Copied", className: "text-amber-700 dark:text-amber-400" },
+  T: { label: "Type changed", className: "text-muted-foreground" },
+};

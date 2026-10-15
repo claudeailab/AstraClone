@@ -28,6 +28,10 @@ GitHub secret scanning on the MCP tools rejects any `ghp_…` token passed as a 
 
 Any change to `sync-git.ts` must re-run the source-protection suite: snapshot `git for-each-ref` of the source bare repo (plus a count of files modified after `config`) before and after every one-way scenario — default with a diverged destination, force push, tags, branch filter, no tags — and require identical snapshots. Also assert: destination-only branches/tags are not copied back, a `readOnly` source refuses writes even in two-way, and source == destination is refused.
 
+## Engine test suites
+
+Three suites run `sync-git.ts` against local bare repos (`node --experimental-strip-types`): regression (create/ff/conflict/force/two-way/filter), source protection, and modes/deletions/files/progress (deletions on/off/forced/conflicting, destination-only refs never deleted, baseline + changes-only, conflict retry, two-way deletion both ways, M/A/D/R file lists, progress stages). Thread `result.state` into the next call to simulate consecutive runs. All must pass before pushing engine changes.
+
 ## Running the full app locally in CCR
 
 Start `dockerd` (sudo), run `mysql:8.4` via Docker, `npm run build`, then `npx next start -p 8030` with the `ASTRACLONE_DB_*`, `ASTRACLONE_ENCRYPTION_KEY`, `ASTRACLONE_ADMIN_*` env vars. Server-side `fetch` needs `NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt` in CCR (the proxy also injects its own GitHub auth, so any token string verifies as the proxy's identity). Never point a test sync at two different real repositories.
