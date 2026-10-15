@@ -18,10 +18,10 @@ export function SyncStatusBadge({ status }: { status: string }) {
 export function SyncRoute({ sync }: { sync: Pick<SyncOverview, "source" | "destination" | "direction"> }) {
   const Icon = sync.direction === "two_way" ? ArrowLeftRight : ArrowRight;
   return (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-mono min-w-0">
-      <span className="truncate">{sync.source}</span>
+    <div className="flex min-w-0 max-w-full flex-wrap items-center gap-x-2 gap-y-0.5 text-sm font-mono md:flex-nowrap" title={`${sync.source} ${sync.direction === "two_way" ? "↔" : "→"} ${sync.destination}`}>
+      <span className="min-w-0 break-all md:truncate">{sync.source}</span>
       <Icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-label={sync.direction === "two_way" ? "two-way" : "one-way"} />
-      <span className="truncate">{sync.destination}</span>
+      <span className="min-w-0 break-all md:truncate">{sync.destination}</span>
     </div>
   );
 }
@@ -154,27 +154,37 @@ export function SyncFacts({ sync }: { sync: Pick<SyncOverview, "direction" | "br
   );
 }
 
-/** One synchronization as a compact horizontal row; stacks vertically on small screens. */
+/**
+ * One synchronization as a compact row of three full-width lines — route · badges / facts / last result + timing · recent runs —
+ * with actions in their own column.
+ */
 export function SyncRow({ sync, actions }: { sync: SyncOverview; actions: React.ReactNode }) {
+  const line = "flex flex-wrap items-center justify-between gap-x-6 gap-y-1";
   return (
     <div className="flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:gap-6">
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className={line}>
           <SyncRoute sync={sync} />
-          <SyncStatusBadge status={sync.lastStatus} />
-          <VerificationBadge verification={sync.verification} verifying={sync.verifying} />
-          {!sync.enabled && <Badge variant="outline" className="gap-1"><PauseCircle className="h-3 w-3" />Paused</Badge>}
+          <div className="flex shrink-0 items-center gap-2">
+            <SyncStatusBadge status={sync.lastStatus} />
+            <VerificationBadge verification={sync.verification} verifying={sync.verifying} />
+            {!sync.enabled && <Badge variant="outline" className="gap-1"><PauseCircle className="h-3 w-3" />Paused</Badge>}
+          </div>
         </div>
         <SyncFacts sync={sync} />
-      </div>
-      <div className="flex min-w-0 flex-col gap-1 md:basis-1/3">
         {sync.running || sync.verifying
           ? <SyncProgressBar progress={sync.progress} />
-          : <p className="truncate text-sm" title={sync.lastMessage ?? undefined}>{sync.lastMessage ?? "Not run yet"}</p>}
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-          <span>Last run {relativeTime(sync.lastRunAt)}{sync.enabled && !sync.running ? ` · next ${relativeTime(nextRunAt(sync))}` : ""}</span>
-          <RunHistoryDots runs={sync.recentRuns} />
-        </div>
+          : (
+            <div className={line}>
+              <p className="min-w-0 text-sm md:truncate" title={sync.lastMessage ?? undefined}>
+                {sync.lastMessage ?? "Not run yet"}
+                <span className="text-xs text-muted-foreground">
+                  {" · "}Last run {relativeTime(sync.lastRunAt)}{sync.enabled ? ` · next ${relativeTime(nextRunAt(sync))}` : ""}
+                </span>
+              </p>
+              <RunHistoryDots runs={sync.recentRuns} />
+            </div>
+          )}
       </div>
       <div className="flex shrink-0 items-center gap-1">{actions}</div>
     </div>

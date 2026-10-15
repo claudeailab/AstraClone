@@ -117,7 +117,7 @@ Always prefer `mcp__github__*` tools over curl for GitHub API calls — the MCP 
 
 ## List layouts
 
-- Accounts and synchronizations are compact horizontal rows inside one `Card` (`divide-y`), not card grids. Sync rows use the shared `SyncRow` (admin passes Run/History/Edit/Delete actions, user area passes Details); facts render as one line of small icon+text items (`SyncFacts`). Rows stack vertically below `md`.
+- Accounts and synchronizations are compact horizontal rows inside one `Card` (`divide-y`), not card grids. Sync rows use the shared `SyncRow`: three full-width lines — route (left) · status + verification badges (right) / facts (`SyncFacts`, one line of icon+text items) / last result + timing (left) · recent-run dots (right) — with actions in their own column (admin: equal-size icon buttons Run/Verify/History/Edit/Delete; user: Details). From `md` up each line stays single-line (route and result truncate); below `md` they wrap instead of truncating. The admin `<main>` has `min-w-0` so long nowrap text can never widen the page on mobile.
 
 ## Sync form layout
 

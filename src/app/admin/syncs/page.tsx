@@ -235,8 +235,8 @@ export default function SyncsPage() {
                 sync={s}
                 actions={
                   <>
-                    <Button size="sm" onClick={() => handleRun(s)} disabled={s.running || s.verifying} aria-label="Run now">
-                      {s.running ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Play className="h-4 w-4 mr-1" />Run</>}
+                    <Button size="icon" onClick={() => handleRun(s)} disabled={s.running || s.verifying} aria-label="Run now" title="Run now">
+                      {s.running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
                     </Button>
                     <Button size="icon" variant="ghost" aria-label="Verify" title="Verify replica" onClick={() => handleVerify(s)} disabled={s.running || s.verifying}><ShieldCheck className="h-4 w-4" /></Button>
                     <Button size="icon" variant="ghost" aria-label="History" title="History" onClick={() => openHistory(s)}><History className="h-4 w-4" /></Button>
