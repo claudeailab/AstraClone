@@ -28,7 +28,7 @@ export default function AdminSidebar({ user, features, platform }: Props) {
   const path = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const handleLogout = () => { window.location.href = "/api/auth/logout"; };
+  const handleLogout = () => { window.location.href = "/api/auth/logout?area=admin"; };
 
   const dashboardItem: NavItem = { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true };
 

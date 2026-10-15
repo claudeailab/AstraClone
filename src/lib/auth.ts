@@ -4,26 +4,34 @@ import { db } from "./db";
 import { sessions, users, permission_groups } from "./db/schema";
 import { eq } from "drizzle-orm";
 import crypto from "crypto";
-import { roleFromPermissions } from "./permissions";
+import { roleFromPermissions, type Role } from "./permissions";
+import { SECURITY_CONVENTIONS } from "./security-conventions";
+import type { NextResponse } from "next/server";
 
-export async function getSession() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("astraclone-session")?.value;
-  if (!token) return null;
+export type SessionArea = keyof typeof SECURITY_CONVENTIONS.sessionCookies;
 
-  const [session] = await db
-    .select({ id: sessions.id, userId: sessions.userId, expiresAt: sessions.expiresAt })
-    .from(sessions)
-    .where(eq(sessions.id, token))
-    .limit(1);
-
-  if (!session || session.expiresAt < new Date()) return null;
-  return session;
+export function sessionCookieName(area: SessionArea) {
+  return SECURITY_CONVENTIONS.sessionCookies[area];
 }
 
-export async function getUser() {
-  const session = await getSession();
-  if (!session) return null;
+export function sessionAreaForRole(role: Role): SessionArea {
+  return role === "administrator" ? "admin" : "user";
+}
+
+export function setSessionCookie(res: NextResponse, role: Role, token: string, secure: boolean) {
+  res.cookies.set(sessionCookieName(sessionAreaForRole(role)), token, {
+    httpOnly: true,
+    secure,
+    sameSite: "lax",
+    maxAge: 7 * 24 * 60 * 60,
+    path: "/",
+  });
+}
+
+async function getAreaUser(area: SessionArea) {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(sessionCookieName(area))?.value;
+  if (!token) return null;
 
   const [row] = await db
     .select({
@@ -32,16 +40,29 @@ export async function getUser() {
       username: users.username,
       displayName: users.displayName,
       groupId: users.groupId,
+      disabled: users.disabled,
+      expiresAt: sessions.expiresAt,
       permissions: permission_groups.permissions,
     })
-    .from(users)
+    .from(sessions)
+    .innerJoin(users, eq(sessions.userId, users.id))
     .leftJoin(permission_groups, eq(users.groupId, permission_groups.id))
-    .where(eq(users.id, session.userId))
+    .where(eq(sessions.id, token))
     .limit(1);
 
-  if (!row) return null;
+  if (!row || row.expiresAt < new Date() || row.disabled) return null;
   const role = roleFromPermissions(row.permissions);
-  return { id: row.id, email: row.username ?? row.email, displayName: row.displayName, groupId: row.groupId, role, isAdmin: role === "administrator" };
+  if (!role || sessionAreaForRole(role) !== area) return null;
+  return { id: row.id, email: row.username ?? row.email, displayName: row.displayName, groupId: row.groupId, role, isAdmin: role === "administrator", area };
+}
+
+/** The signed-in user for the user area (an administrator session also qualifies). */
+export async function getUser() {
+  return (await getAreaUser("user")) ?? (await getAreaUser("admin"));
+}
+
+export async function getAdmin() {
+  return getAreaUser("admin");
 }
 
 export async function requireSession() {
@@ -51,14 +72,12 @@ export async function requireSession() {
 }
 
 export async function requireUserArea() {
-  const user = await getUser();
-  if (!user || !user.role) redirect("/login");
-  return user;
+  return requireSession();
 }
 
 export async function requireAdmin() {
-  const user = await getUser();
-  if (!user || !user.isAdmin) redirect("/login");
+  const user = await getAdmin();
+  if (!user) redirect("/login");
   return user;
 }
 

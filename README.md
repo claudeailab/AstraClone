@@ -25,6 +25,7 @@ Keeps GitHub repositories in sync. Add GitHub accounts and repositories, define 
 - Two roles, assigned through groups: **Administrator** (admin area, `/admin`) and **User** (user area, `/user`); accounts without a role cannot sign in
 - Auto-seeds first admin from environment variables
 - In-memory rate limiting on login
+- Separate admin and user sessions: an administrator and a user can be signed in at the same time in one browser (different tabs), each surviving reloads and logging out independently
 
 ### Admin Panel
 - Sidebar navigation with feature-flag gating

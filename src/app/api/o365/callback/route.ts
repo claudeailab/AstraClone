@@ -4,7 +4,7 @@ import { getBaseUrl } from "@/lib/base-url";
 import { db } from "@/lib/db";
 import { users, permission_groups } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { createSession } from "@/lib/auth";
+import { createSession, setSessionCookie } from "@/lib/auth";
 import { homeForRole, roleFromPermissions } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
 
@@ -95,13 +95,7 @@ export async function GET(req: NextRequest) {
   const isSecure = req.headers.get("x-forwarded-proto") === "https";
 
   const res = NextResponse.redirect(`${base}${redirectPath}`);
-  res.cookies.set("astraclone-session", token, {
-    httpOnly: true,
-    secure: isSecure,
-    sameSite: "lax",
-    maxAge: 7 * 24 * 60 * 60,
-    path: "/",
-  });
+  setSessionCookie(res, role, token, isSecure);
   res.cookies.delete("azure-oauth-state");
   return res;
 }

@@ -4,7 +4,7 @@ import bcrypt from "bcrypt";
 import { db } from "@/lib/db";
 import { users, permission_groups } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { createSession } from "@/lib/auth";
+import { createSession, setSessionCookie } from "@/lib/auth";
 import { isRateLimited } from "@/lib/rate-limit";
 import { homeForRole, roleFromPermissions, type Role } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
@@ -95,12 +95,6 @@ export async function POST(req: NextRequest) {
   await logAudit({ userEmail: user.username ?? user.email, action: "login", resource: "auth", ip });
 
   const res = NextResponse.json({ redirect: redirectPath });
-  res.cookies.set("astraclone-session", token, {
-    httpOnly: true,
-    secure: isSecure,
-    sameSite: "lax",
-    maxAge: 7 * 24 * 60 * 60,
-    path: "/",
-  });
+  setSessionCookie(res, role, token, isSecure);
   return res;
 }

@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { deleteSession } from "@/lib/auth";
+import { deleteSession, sessionCookieName, type SessionArea } from "@/lib/auth";
 import { getBaseUrl } from "@/lib/base-url";
 
+// Signs out of one area (?area=admin|user) and leaves the other area's session intact.
 async function logout(req: NextRequest) {
-  const token = req.cookies.get("astraclone-session")?.value;
-  if (token) await deleteSession(token);
+  const area = new URL(req.url).searchParams.get("area");
+  const areas: SessionArea[] = area === "admin" || area === "user" ? [area] : ["admin", "user"];
   const res = NextResponse.redirect(`${getBaseUrl(req)}/login`);
-  res.cookies.delete("astraclone-session");
+  for (const a of areas) {
+    const name = sessionCookieName(a);
+    const token = req.cookies.get(name)?.value;
+    if (token) await deleteSession(token);
+    res.cookies.delete(name);
+  }
   return res;
 }
 

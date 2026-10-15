@@ -8,7 +8,7 @@ import { iconUrl } from "@/lib/platform-shared";
 import version from "../../../version.json";
 
 interface Props {
-  user: { email: string; displayName?: string | null; isAdmin: boolean };
+  user: { email: string; displayName?: string | null; isAdmin: boolean; area: "admin" | "user" };
   platform: PlatformInfo;
 }
 
@@ -67,7 +67,7 @@ export default function UserHeader({ user, platform }: Props) {
               )}
               <DropdownMenu.Separator className="my-1 h-px bg-border" />
               <DropdownMenu.Item asChild className={itemClass}>
-                <a href="/api/auth/logout"><LogOut className="h-4 w-4 opacity-60" />Log out</a>
+                <a href={`/api/auth/logout?area=${user.area}`}><LogOut className="h-4 w-4 opacity-60" />Log out</a>
               </DropdownMenu.Item>
             </DropdownMenu.Content>
           </DropdownMenu.Portal>

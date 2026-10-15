@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, PauseCircle } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { muted, sectionTitle } from "@/lib/ui-conventions";
-import { nextRunAt, relativeTime, syncStatus, type SyncOverview, type SyncStatus } from "@/lib/sync-shared";
-import { RunHistoryDots, RunHistoryList, SyncFacts, SyncProgressBar, SyncRoute, SyncStatusBadge, type RunDetail } from "@/components/sync/SyncDisplay";
+import { syncStatus, type SyncOverview, type SyncStatus } from "@/lib/sync-shared";
+import { RunHistoryList, SyncFacts, SyncRoute, SyncRow, type RunDetail } from "@/components/sync/SyncDisplay";
 import { cn } from "@/lib/utils";
 
 const SUMMARY: SyncStatus[] = ["success", "conflict", "failed", "running"];
@@ -56,32 +55,11 @@ export default function SyncStatusBoard() {
 
       <div className="flex flex-col gap-3">
         <h2 className={sectionTitle}>Synchronizations</h2>
-        <div className="grid gap-4 lg:grid-cols-2">
+        <Card className="divide-y overflow-hidden">
           {syncs.map(s => (
-            <Card key={s.id}>
-              <CardHeader className="pb-2 flex flex-col gap-1.5">
-                <CardTitle className="text-base font-normal"><SyncRoute sync={s} /></CardTitle>
-                <div className="flex flex-wrap items-center gap-2">
-                  <SyncStatusBadge status={s.lastStatus} />
-                  {!s.enabled && <Badge variant="outline" className="gap-1"><PauseCircle className="h-3 w-3" />Paused</Badge>}
-                </div>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-3">
-                <SyncFacts sync={s} />
-                {s.running ? <SyncProgressBar progress={s.progress} /> : s.lastMessage && <p className="text-sm break-words">{s.lastMessage}</p>}
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex flex-col gap-1.5">
-                    <span className="text-xs text-muted-foreground">
-                      Last run {relativeTime(s.lastRunAt)}{s.enabled && !s.running ? ` · next ${relativeTime(nextRunAt(s))}` : ""}
-                    </span>
-                    <RunHistoryDots runs={s.recentRuns} />
-                  </div>
-                  <Button size="sm" variant="outline" onClick={() => openDetails(s)}>Details</Button>
-                </div>
-              </CardContent>
-            </Card>
+            <SyncRow key={s.id} sync={s} actions={<Button size="sm" variant="outline" onClick={() => openDetails(s)}>Details</Button>} />
           ))}
-        </div>
+        </Card>
       </div>
 
       <Dialog open={selected !== null} onOpenChange={() => setSelected(null)}>

@@ -108,3 +108,13 @@ Always prefer `mcp__github__*` tools over curl for GitHub API calls — the MCP 
 - `syncs.ref_state` (JSON `{src, dst}` of `heads/<b>`/`tags/<t>` → sha after the last run) drives `mode: "changes"` (only refs that moved since the last run; first run = baseline, nothing pushed) and `propagateDeletes` (a ref in the previous state but gone now is deleted on the other side only if that side still equals the previous source sha; `forcePush` overrides in one-way). Conflicted refs keep their previous state so they are retried. State is reset (NULL) when source, destination, direction, branches, tags or mode change.
 - `sync_runs.changes` (JSON `RefChange[]`, ≤1000 files per ref) + `files_changed`; new branches list files vs the merge-base with the other side's default branch. Served to admins and users via `/api/syncs/runs?id=`.
 - Progress: `syncRepositories(..., onProgress)` reports stage + percent (git `--progress` parsed from stderr via `spawn`); kept in memory in `sync-engine.ts` and returned as `SyncOverview.progress` while running; UI polls every 3s while anything runs.
+
+## Sessions
+
+- Two independent session cookies (`SECURITY_CONVENTIONS.sessionCookies`): `astraclone-admin-session` and `astraclone-user-session`, so an administrator and a user can be signed in side by side in one browser. Login and Azure SSO pick the cookie from the account's role via `setSessionCookie()`.
+- `getAdmin()`/`requireAdmin()` read only the admin cookie; `getUser()`/`requireSession()`/`requireUserArea()` read the user cookie, falling back to the admin cookie (admins may view `/user`). A session is rejected if the account is disabled or its role no longer matches the cookie's area.
+- Logout is per area: `/api/auth/logout?area=admin|user` (no area = both). `/` redirects to `/admin` if an admin session exists, else `/user`, else `/login`.
+
+## List layouts
+
+- Accounts and synchronizations are compact horizontal rows inside one `Card` (`divide-y`), not card grids. Sync rows use the shared `SyncRow` (admin passes Run/History/Edit/Delete actions, user area passes Details); facts render as one line of small icon+text items (`SyncFacts`). Rows stack vertically below `md`.

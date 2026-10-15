@@ -5,15 +5,14 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Plus, Pencil, Trash2, Play, History, PauseCircle, Check } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, Play, History, Check } from "lucide-react";
 import { pageWrapper, pageInner, pageTitle, muted } from "@/lib/ui-conventions";
-import { SYNC_DIRECTIONS, SYNC_INTERVALS, SYNC_MODES, intervalLabel, nextRunAt, relativeTime, routeLabel, type SyncDirection, type SyncMode, type SyncOverview } from "@/lib/sync-shared";
-import { RunHistoryDots, RunHistoryList, SyncFacts, SyncProgressBar, SyncRoute, SyncStatusBadge, type RunDetail } from "@/components/sync/SyncDisplay";
+import { SYNC_DIRECTIONS, SYNC_INTERVALS, SYNC_MODES, intervalLabel, routeLabel, type SyncDirection, type SyncMode, type SyncOverview } from "@/lib/sync-shared";
+import { RunHistoryList, SyncRoute, SyncRow, type RunDetail } from "@/components/sync/SyncDisplay";
 
 interface Account { id: number; name: string; username: string }
 interface AccountRepo { fullName: string; isPrivate: boolean; canPush: boolean }
@@ -219,43 +218,24 @@ export default function SyncsPage() {
         ) : syncs.length === 0 ? (
           <p className={`text-center py-12 ${muted}`}>No synchronizations yet.</p>
         ) : (
-          <div className="grid gap-4 lg:grid-cols-2">
+          <Card className="divide-y overflow-hidden">
             {syncs.map(s => (
-              <Card key={s.id}>
-                <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2">
-                  <div className="min-w-0 flex flex-col gap-1.5">
-                    <CardTitle className="text-base font-normal"><SyncRoute sync={s} /></CardTitle>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <SyncStatusBadge status={s.lastStatus} />
-                      {!s.enabled && <Badge variant="outline" className="gap-1"><PauseCircle className="h-3 w-3" />Paused</Badge>}
-                    </div>
-                  </div>
-                  <div className="flex gap-1 shrink-0">
-                    <Button size="icon" variant="ghost" aria-label="Edit" onClick={() => openEdit(s)}><Pencil className="h-4 w-4" /></Button>
-                    <Button size="icon" variant="ghost" aria-label="Delete" onClick={() => setDeleteTarget(s)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-3">
-                  <SyncFacts sync={s} />
-                  {s.running ? <SyncProgressBar progress={s.progress} /> : s.lastMessage && <p className="text-sm break-words">{s.lastMessage}</p>}
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex flex-col gap-1.5">
-                      <span className="text-xs text-muted-foreground">
-                        Last run {relativeTime(s.lastRunAt)}{s.enabled && !s.running ? ` · next ${relativeTime(nextRunAt(s))}` : ""}
-                      </span>
-                      <RunHistoryDots runs={s.recentRuns} />
-                    </div>
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => openHistory(s)}><History className="h-4 w-4 mr-1" />History</Button>
-                      <Button size="sm" onClick={() => handleRun(s)} disabled={s.running}>
-                        {s.running ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Play className="h-4 w-4 mr-1" />Run now</>}
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <SyncRow
+                key={s.id}
+                sync={s}
+                actions={
+                  <>
+                    <Button size="sm" onClick={() => handleRun(s)} disabled={s.running} aria-label="Run now">
+                      {s.running ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Play className="h-4 w-4 mr-1" />Run</>}
+                    </Button>
+                    <Button size="icon" variant="ghost" aria-label="History" title="History" onClick={() => openHistory(s)}><History className="h-4 w-4" /></Button>
+                    <Button size="icon" variant="ghost" aria-label="Edit" title="Edit" onClick={() => openEdit(s)}><Pencil className="h-4 w-4" /></Button>
+                    <Button size="icon" variant="ghost" aria-label="Delete" title="Delete" onClick={() => setDeleteTarget(s)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                  </>
+                }
+              />
             ))}
-          </div>
+          </Card>
         )}
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

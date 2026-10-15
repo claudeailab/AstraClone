@@ -16,6 +16,7 @@
 
 export const SECURITY_CONVENTIONS = {
   maxQueryLimit: 100,
-  sessionCookieName: "astraclone-session",
+  // Separate cookies let an administrator and a user be signed in side by side in one browser.
+  sessionCookies: { admin: "astraclone-admin-session", user: "astraclone-user-session" },
   loginRateLimit: { limit: 10, windowMs: 60_000 },
 } as const;

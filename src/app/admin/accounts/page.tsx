@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Loader2, Plus, Pencil, Trash2, KeyRound, Plug } from "lucide-react";
 import { pageWrapper, pageInner, pageTitle, muted } from "@/lib/ui-conventions";
@@ -84,28 +84,25 @@ export default function AccountsPage() {
         ) : accounts.length === 0 ? (
           <p className={`text-center py-12 ${muted}`}>No GitHub accounts yet. Add one to get started.</p>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <Card className="divide-y overflow-hidden">
             {accounts.map(a => (
-              <Card key={a.id}>
-                <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2">
-                  <div className="min-w-0">
-                    <CardTitle className="text-base truncate">{a.name}</CardTitle>
-                    <p className="text-sm text-muted-foreground truncate">@{a.username}</p>
-                  </div>
-                  <div className="flex gap-1 shrink-0">
-                    <Button size="icon" variant="ghost" aria-label="Edit" onClick={() => { setForm({ id: a.id, name: a.name, token: "" }); setDialogOpen(true); }}><Pencil className="h-4 w-4" /></Button>
-                    <Button size="icon" variant="ghost" aria-label="Delete" onClick={() => setDeleteTarget(a)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="flex items-center justify-between gap-2">
-                  <span className={muted}>Used by {a.syncCount} synchronization{a.syncCount === 1 ? "" : "s"}</span>
+              <div key={a.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+                <KeyRound className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <div className="flex min-w-0 flex-1 flex-col sm:flex-row sm:items-baseline sm:gap-2">
+                  <span className="truncate font-medium">{a.name}</span>
+                  <span className="truncate text-sm text-muted-foreground">@{a.username}</span>
+                </div>
+                <span className={`${muted} whitespace-nowrap`}>Used by {a.syncCount} sync{a.syncCount === 1 ? "" : "s"}</span>
+                <div className="flex shrink-0 items-center gap-1">
                   <Button size="sm" variant="outline" onClick={() => handleTest(a)} disabled={testing === a.id}>
-                    {testing === a.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Plug className="h-4 w-4 mr-1" /> Test</>}
+                    {testing === a.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Plug className="h-4 w-4 mr-1" />Test</>}
                   </Button>
-                </CardContent>
-              </Card>
+                  <Button size="icon" variant="ghost" aria-label="Edit" title="Edit" onClick={() => { setForm({ id: a.id, name: a.name, token: "" }); setDialogOpen(true); }}><Pencil className="h-4 w-4" /></Button>
+                  <Button size="icon" variant="ghost" aria-label="Delete" title="Delete" onClick={() => setDeleteTarget(a)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                </div>
+              </div>
             ))}
-          </div>
+          </Card>
         )}
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

@@ -1,9 +1,9 @@
 "use client";
 
-import { ArrowLeftRight, ArrowRight, ChevronRight, Clock, FileText, GitBranch, History, Loader2, Tag, Trash2, Zap } from "lucide-react";
+import { ArrowLeftRight, ArrowRight, ChevronRight, Clock, FileText, GitBranch, History, Loader2, PauseCircle, Tag, Trash2, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { FILE_STATUS, intervalLabel, syncStatus, type RefChange, type SyncOverview, type SyncProgress, type SyncRunSummary } from "@/lib/sync-shared";
+import { FILE_STATUS, intervalLabel, nextRunAt, relativeTime, syncStatus, type RefChange, type SyncOverview, type SyncProgress, type SyncRunSummary } from "@/lib/sync-shared";
 
 export function SyncStatusBadge({ status }: { status: string }) {
   const s = syncStatus(status);
@@ -137,18 +137,45 @@ export function SyncProgressBar({ progress }: { progress: SyncProgress | null })
 }
 
 export function SyncFacts({ sync }: { sync: Pick<SyncOverview, "direction" | "branches" | "syncTags" | "forcePush" | "intervalMinutes" | "mode" | "propagateDeletes"> }) {
+  const item = "inline-flex items-center gap-1 whitespace-nowrap";
   return (
-    <div className="flex flex-wrap gap-1.5">
-      <Badge variant="secondary" className="gap-1">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+      <span className={item}>
         {sync.direction === "two_way" ? <ArrowLeftRight className="h-3 w-3" /> : <ArrowRight className="h-3 w-3" />}
         {sync.direction === "two_way" ? "Two-way" : "One-way"}
-      </Badge>
-      <Badge variant="secondary" className="gap-1"><Clock className="h-3 w-3" />{intervalLabel(sync.intervalMinutes)}</Badge>
-      <Badge variant="secondary" className="gap-1 font-mono"><GitBranch className="h-3 w-3" />{sync.branches || "all branches"}</Badge>
-      {sync.syncTags && <Badge variant="secondary" className="gap-1"><Tag className="h-3 w-3" />Tags</Badge>}
-      {sync.mode === "changes" && <Badge variant="secondary" className="gap-1"><History className="h-3 w-3" />Changes only</Badge>}
-      {sync.propagateDeletes && <Badge variant="secondary" className="gap-1"><Trash2 className="h-3 w-3" />Mirrors deletions</Badge>}
-      {sync.forcePush && <Badge className="gap-1 border-transparent bg-amber-500/15 text-amber-700 dark:text-amber-400"><Zap className="h-3 w-3" />Force push</Badge>}
+      </span>
+      <span className={item}><Clock className="h-3 w-3" />{intervalLabel(sync.intervalMinutes)}</span>
+      <span className={`${item} font-mono`}><GitBranch className="h-3 w-3" />{sync.branches || "all branches"}</span>
+      {sync.syncTags && <span className={item}><Tag className="h-3 w-3" />Tags</span>}
+      {sync.mode === "changes" && <span className={item}><History className="h-3 w-3" />Changes only</span>}
+      {sync.propagateDeletes && <span className={item}><Trash2 className="h-3 w-3" />Mirrors deletions</span>}
+      {sync.forcePush && <span className={`${item} text-amber-700 dark:text-amber-400`}><Zap className="h-3 w-3" />Force push</span>}
+    </div>
+  );
+}
+
+/** One synchronization as a compact horizontal row; stacks vertically on small screens. */
+export function SyncRow({ sync, actions }: { sync: SyncOverview; actions: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:gap-6">
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <SyncRoute sync={sync} />
+          <SyncStatusBadge status={sync.lastStatus} />
+          {!sync.enabled && <Badge variant="outline" className="gap-1"><PauseCircle className="h-3 w-3" />Paused</Badge>}
+        </div>
+        <SyncFacts sync={sync} />
+      </div>
+      <div className="flex min-w-0 flex-col gap-1 md:basis-1/3">
+        {sync.running
+          ? <SyncProgressBar progress={sync.progress} />
+          : <p className="truncate text-sm" title={sync.lastMessage ?? undefined}>{sync.lastMessage ?? "Not run yet"}</p>}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+          <span>Last run {relativeTime(sync.lastRunAt)}{sync.enabled && !sync.running ? ` · next ${relativeTime(nextRunAt(sync))}` : ""}</span>
+          <RunHistoryDots runs={sync.recentRuns} />
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center gap-1">{actions}</div>
     </div>
   );
 }
