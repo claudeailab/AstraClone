@@ -1,9 +1,9 @@
 "use client";
 
-import { ArrowLeftRight, ArrowRight, Loader2 } from "lucide-react";
+import { ArrowLeftRight, ArrowRight, Clock, GitBranch, Loader2, Tag, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { syncStatus, type SyncOverview, type SyncRunSummary } from "@/lib/sync-shared";
+import { intervalLabel, syncStatus, type SyncOverview, type SyncRunSummary } from "@/lib/sync-shared";
 
 export function SyncStatusBadge({ status }: { status: string }) {
   const s = syncStatus(status);
@@ -64,5 +64,20 @@ export function RunHistoryList({ runs }: { runs: (SyncRunSummary & { details?: s
         </li>
       ))}
     </ul>
+  );
+}
+
+export function SyncFacts({ sync }: { sync: Pick<SyncOverview, "direction" | "branches" | "syncTags" | "forcePush" | "intervalMinutes"> }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      <Badge variant="secondary" className="gap-1">
+        {sync.direction === "two_way" ? <ArrowLeftRight className="h-3 w-3" /> : <ArrowRight className="h-3 w-3" />}
+        {sync.direction === "two_way" ? "Two-way" : "One-way"}
+      </Badge>
+      <Badge variant="secondary" className="gap-1"><Clock className="h-3 w-3" />{intervalLabel(sync.intervalMinutes)}</Badge>
+      <Badge variant="secondary" className="gap-1 font-mono"><GitBranch className="h-3 w-3" />{sync.branches || "all branches"}</Badge>
+      {sync.syncTags && <Badge variant="secondary" className="gap-1"><Tag className="h-3 w-3" />Tags</Badge>}
+      {sync.forcePush && <Badge className="gap-1 border-transparent bg-amber-500/15 text-amber-700 dark:text-amber-400"><Zap className="h-3 w-3" />Force push</Badge>}
+    </div>
   );
 }

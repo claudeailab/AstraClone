@@ -53,3 +53,41 @@ export async function inspectRepo(token: string, owner: string, name: string):
 export function repoUrl(owner: string, name: string) {
   return `https://github.com/${owner}/${name}.git`;
 }
+
+const MAX_PAGES = 10;
+
+async function paginate<T>(path: string, token: string): Promise<{ ok: true; items: T[] } | { ok: false; error: string }> {
+  const items: T[] = [];
+  try {
+    for (let page = 1; page <= MAX_PAGES; page++) {
+      const r = await gh(`${path}${path.includes("?") ? "&" : "?"}per_page=100&page=${page}`, token);
+      if (r.status === 401) return { ok: false, error: "Account token is invalid or expired" };
+      if (r.status === 403) return { ok: false, error: "GitHub denied the request — check the token's permissions" };
+      if (!r.ok) return { ok: false, error: `GitHub returned ${r.status}` };
+      const batch = await r.json() as T[];
+      items.push(...batch);
+      if (batch.length < 100) break;
+    }
+    return { ok: true, items };
+  } catch {
+    return { ok: false, error: "Could not reach GitHub" };
+  }
+}
+
+export interface AccountRepo { owner: string; name: string; isPrivate: boolean; canPush: boolean }
+
+export async function listAccountRepos(token: string) {
+  type Raw = { name: string; owner: { login: string }; private: boolean; permissions?: { push?: boolean } };
+  const r = await paginate<Raw>("/user/repos?affiliation=owner,collaborator,organization_member&sort=full_name", token);
+  if (!r.ok) return r;
+  return {
+    ok: true as const,
+    repos: r.items.map((x): AccountRepo => ({ owner: x.owner.login, name: x.name, isPrivate: x.private, canPush: !!x.permissions?.push })),
+  };
+}
+
+export async function listBranches(token: string, owner: string, name: string) {
+  const r = await paginate<{ name: string }>(`/repos/${owner}/${name}/branches`, token);
+  if (!r.ok) return r;
+  return { ok: true as const, branches: r.items.map(b => b.name) };
+}

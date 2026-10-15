@@ -12,7 +12,7 @@ import { pageWrapper, pageInner, pageTitle, muted } from "@/lib/ui-conventions";
 
 interface Account { id: number; name: string; username: string; repoCount: number }
 
-const emptyForm = { id: 0, name: "", username: "", token: "" };
+const emptyForm = { id: 0, name: "", token: "" };
 
 export default function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -25,7 +25,7 @@ export default function AccountsPage() {
 
   const load = useCallback(async () => {
     try {
-      const r = await fetch("/api/admin/management/connections");
+      const r = await fetch("/api/admin/accounts");
       const d = await r.json();
       setAccounts(d.connections ?? []);
     } finally { setLoading(false); }
@@ -36,10 +36,10 @@ export default function AccountsPage() {
   async function handleSave() {
     setSaving(true);
     try {
-      const r = await fetch("/api/admin/management/connections", {
+      const r = await fetch("/api/admin/accounts", {
         method: form.id ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form.id ? form : { name: form.name, username: form.username, token: form.token }),
+        body: JSON.stringify(form.id ? form : { name: form.name, token: form.token }),
       });
       const d = await r.json();
       if (!r.ok) { toast.error(d.error ?? "Save failed"); return; }
@@ -52,7 +52,7 @@ export default function AccountsPage() {
   async function handleTest(a: Account) {
     setTesting(a.id);
     try {
-      const r = await fetch("/api/admin/management/connections/test", {
+      const r = await fetch("/api/admin/accounts/test", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: a.id }),
       });
       const d = await r.json();
@@ -62,7 +62,7 @@ export default function AccountsPage() {
   }
 
   async function handleDelete(a: Account) {
-    const r = await fetch(`/api/admin/management/connections?id=${a.id}`, { method: "DELETE" });
+    const r = await fetch(`/api/admin/accounts?id=${a.id}`, { method: "DELETE" });
     const d = await r.json();
     if (!r.ok) { toast.error(d.error ?? "Delete failed"); return; }
     toast.success("Account removed");
@@ -93,7 +93,7 @@ export default function AccountsPage() {
                     <p className="text-sm text-muted-foreground truncate">@{a.username}</p>
                   </div>
                   <div className="flex gap-1 shrink-0">
-                    <Button size="icon" variant="ghost" aria-label="Edit" onClick={() => { setForm({ id: a.id, name: a.name, username: a.username, token: "" }); setDialogOpen(true); }}><Pencil className="h-4 w-4" /></Button>
+                    <Button size="icon" variant="ghost" aria-label="Edit" onClick={() => { setForm({ id: a.id, name: a.name, token: "" }); setDialogOpen(true); }}><Pencil className="h-4 w-4" /></Button>
                     <Button size="icon" variant="ghost" aria-label="Delete" onClick={() => setDeleteTarget(a)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                   </div>
                 </CardHeader>
@@ -113,12 +113,8 @@ export default function AccountsPage() {
             <DialogHeader><DialogTitle>{form.id ? "Edit Account" : "Add GitHub Account"}</DialogTitle></DialogHeader>
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
-                <Label>Name</Label>
-                <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Company org bot" />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label>GitHub username <span className="text-muted-foreground font-normal">(optional)</span></Label>
-                <Input value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))} placeholder="Detected from the token" autoComplete="off" />
+                <Label>Name {!form.id && <span className="text-muted-foreground font-normal">(optional)</span>}</Label>
+                <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Defaults to the GitHub username" />
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label className="flex items-center gap-1.5"><KeyRound className="h-3.5 w-3.5" /> Personal access token</Label>
@@ -128,7 +124,7 @@ export default function AccountsPage() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleSave} disabled={saving || !form.name.trim() || (!form.id && !form.token.trim())}>
+              <Button onClick={handleSave} disabled={saving || (form.id ? !form.name.trim() : !form.token.trim())}>
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
               </Button>
             </DialogFooter>

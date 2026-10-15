@@ -28,6 +28,8 @@ GitHub secret scanning on the MCP tools rejects any `ghp_…` token passed as a 
 
 Start `dockerd` (sudo), run `mysql:8.4` via Docker, `npm run build`, then `npx next start -p 8030` with the `ASTRACLONE_DB_*`, `ASTRACLONE_ENCRYPTION_KEY`, `ASTRACLONE_ADMIN_*` env vars. Server-side `fetch` needs `NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt` in CCR (the proxy also injects its own GitHub auth, so any token string verifies as the proxy's identity). Never point a test sync at two different real repositories.
 
+In CCR the proxy only allows repository-scoped GitHub endpoints, so `/user/repos` (account repository list) returns 403 there — it works with a real PAT in production. To browser-test the repository picker, stub `/api/admin/accounts/repos` with Playwright `page.route`, and create the context with `serviceWorkers: "block"` — the app's PWA service worker otherwise handles fetches and bypasses `page.route`.
+
 ## Bumping the Version
 
 Update all three files atomically:

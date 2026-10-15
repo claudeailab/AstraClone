@@ -5,11 +5,12 @@ import { db } from "@/lib/db";
 import { permission_groups, users } from "@/lib/db/schema";
 import { eq, count } from "drizzle-orm";
 import { logAudit } from "@/lib/audit";
+import { ROLE_KEYS, roleFromPermissions } from "@/lib/permissions";
 
 const groupSchema = z.object({
-  name: z.string().min(1).max(255),
+  name: z.string().trim().min(1).max(255),
   description: z.string().max(500).optional(),
-  permissions: z.array(z.string()).default([]),
+  role: z.enum(ROLE_KEYS),
 });
 
 export async function GET() {
@@ -30,8 +31,12 @@ export async function GET() {
 
   return NextResponse.json({
     groups: rows.map(r => ({
-      ...r,
-      permissions: JSON.parse(r.permissions || "[]") as string[],
+      id: r.id,
+      name: r.name,
+      description: r.description,
+      createdAt: r.createdAt,
+      userCount: r.userCount,
+      role: roleFromPermissions(r.permissions),
     })),
   });
 }
@@ -42,13 +47,13 @@ export async function POST(req: NextRequest) {
   const parsed = groupSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
-  const { name, description, permissions } = parsed.data;
+  const { name, description, role } = parsed.data;
   await db.insert(permission_groups).values({
-    name, description, permissions: JSON.stringify(permissions),
+    name, description, permissions: JSON.stringify([role]),
   });
 
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  await logAudit({ userEmail: admin.email, action: "create", resource: "group", detail: `name=${name}`, ip });
+  await logAudit({ userEmail: admin.email, action: "create", resource: "group", detail: `name=${name}; role=${role}`, ip });
   return NextResponse.json({ ok: true });
 }
 
@@ -61,13 +66,13 @@ export async function PUT(req: NextRequest) {
   const parsed = groupSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
-  const { name, description, permissions } = parsed.data;
+  const { name, description, role } = parsed.data;
   await db.update(permission_groups)
-    .set({ name, description, permissions: JSON.stringify(permissions) })
+    .set({ name, description, permissions: JSON.stringify([role]) })
     .where(eq(permission_groups.id, id));
 
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  await logAudit({ userEmail: admin.email, action: "update", resource: "group", detail: `id=${id}; name=${name}`, ip });
+  await logAudit({ userEmail: admin.email, action: "update", resource: "group", detail: `id=${id}; name=${name}; role=${role}`, ip });
   return NextResponse.json({ ok: true });
 }
 

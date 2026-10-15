@@ -13,7 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { Loader2, Plus, Pencil, Trash2, CheckCircle2, Search } from "lucide-react";
 import { pageWrapper, pageInner, pageTitle } from "@/lib/ui-conventions";
 import { EnvBadge } from "@/components/admin/EnvBadge";
-import { PLATFORM_PERMISSIONS } from "@/lib/permissions";
+import { ROLES, type Role } from "@/lib/permissions";
 import type { FeatureKey } from "@/lib/features";
 import { iconUrl, DEFAULT_ICON, DEFAULT_PRIMARY_COLOR } from "@/lib/platform-shared";
 
@@ -259,11 +259,11 @@ interface Group {
   id: number;
   name: string;
   description: string | null;
-  permissions: string[];
+  role: Role | null;
   userCount: number;
 }
 
-const defaultGroupForm = { name: "", description: "", permissions: [] as string[] };
+const defaultGroupForm = { name: "", description: "", role: "user" as Role };
 
 function PermissionsTab() {
   const [groups, setGroups] = useState<Group[]>([]);
@@ -286,17 +286,8 @@ function PermissionsTab() {
 
   function openNew() { setForm({ id: 0, ...defaultGroupForm }); setDialogOpen(true); }
   function openEdit(g: Group) {
-    setForm({ id: g.id, name: g.name, description: g.description ?? "", permissions: g.permissions });
+    setForm({ id: g.id, name: g.name, description: g.description ?? "", role: g.role ?? "user" });
     setDialogOpen(true);
-  }
-
-  function togglePerm(key: string) {
-    setForm(f => ({
-      ...f,
-      permissions: f.permissions.includes(key)
-        ? f.permissions.filter(p => p !== key)
-        : [...f.permissions, key],
-    }));
   }
 
   async function handleSave() {
@@ -307,7 +298,7 @@ function PermissionsTab() {
       const r = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: form.name, description: form.description || undefined, permissions: form.permissions }),
+        body: JSON.stringify({ name: form.name, description: form.description || undefined, role: form.role }),
       });
       const d = await r.json();
       if (!r.ok) { toast.error(d.error ?? "Save failed"); return; }
@@ -330,12 +321,12 @@ function PermissionsTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">Define access groups and assign permissions to control what users can do.</p>
+        <p className="text-sm text-muted-foreground">Groups grant one role: Administrators use the admin area, Users see the user area.</p>
         <Button size="sm" onClick={openNew}><Plus className="h-4 w-4 mr-1.5" />New Group</Button>
       </div>
 
       {groups.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-8 text-center">No groups yet. Create one to start assigning permissions.</p>
+        <p className="text-sm text-muted-foreground py-8 text-center">No groups yet. Create one to start assigning roles.</p>
       ) : (
         <div className="space-y-3">
           {groups.map(g => (
@@ -347,19 +338,12 @@ function PermissionsTab() {
                     <span className="text-xs text-muted-foreground">{g.userCount} user{g.userCount !== 1 ? "s" : ""}</span>
                   </div>
                   {g.description && <p className="text-xs text-muted-foreground mt-0.5">{g.description}</p>}
-                  {g.permissions.length > 0 ? (
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {g.permissions.map(p => {
-                        const label = PLATFORM_PERMISSIONS.find(x => x.key === p)?.label ?? p;
-                        return (
-                          <span key={p} className="inline-flex items-center gap-1 text-[10px] font-medium bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
-                            <CheckCircle2 className="h-2.5 w-2.5" />{label}
-                          </span>
-                        );
-                      })}
-                    </div>
+                  {g.role ? (
+                    <span className="inline-flex items-center gap-1 mt-2 text-[10px] font-medium bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
+                      <CheckCircle2 className="h-2.5 w-2.5" />{ROLES.find(r => r.key === g.role)?.label}
+                    </span>
                   ) : (
-                    <p className="text-xs text-muted-foreground mt-1 italic">No permissions</p>
+                    <p className="text-xs text-muted-foreground mt-1 italic">No role — members cannot sign in</p>
                   )}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
@@ -389,18 +373,20 @@ function PermissionsTab() {
               <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
             </div>
             <div className="flex flex-col gap-2">
-              <Label>Permissions</Label>
-              <div className="space-y-2">
-                {PLATFORM_PERMISSIONS.map(({ key, label }) => (
-                  <label key={key} className="flex items-center gap-2.5 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={form.permissions.includes(key)}
-                      onChange={() => togglePerm(key)}
-                      className="h-4 w-4 rounded accent-primary"
-                    />
-                    <span className="text-sm">{label}</span>
-                  </label>
+              <Label>Role</Label>
+              <div className="grid gap-2 sm:grid-cols-2" role="radiogroup">
+                {ROLES.map(({ key, label, description }) => (
+                  <button
+                    key={key}
+                    type="button"
+                    role="radio"
+                    aria-checked={form.role === key}
+                    onClick={() => setForm(f => ({ ...f, role: key }))}
+                    className={`flex flex-col gap-0.5 rounded-lg border p-3 text-left transition-colors ${form.role === key ? "border-primary bg-primary/5" : "hover:bg-secondary/50"}`}
+                  >
+                    <span className="text-sm font-medium">{label}</span>
+                    <span className="text-xs text-muted-foreground">{description}</span>
+                  </button>
                 ))}
               </div>
             </div>

@@ -104,7 +104,6 @@ export const repositories = mysqlTable("astraclone_repositories", {
 
 export const syncs = mysqlTable("astraclone_syncs", {
   id: int("id").autoincrement().primaryKey(),
-  name: varchar("name", { length: 255 }).notNull(),
   sourceRepoId: int("source_repo_id").notNull().references(() => repositories.id),
   destRepoId: int("dest_repo_id").notNull().references(() => repositories.id),
   direction: varchar("direction", { length: 20 }).notNull().default("one_way"),

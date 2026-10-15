@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { muted, sectionTitle } from "@/lib/ui-conventions";
 import { nextRunAt, relativeTime, syncStatus, type SyncOverview, type SyncStatus } from "@/lib/sync-shared";
-import { RunHistoryDots, RunHistoryList, SyncRoute, SyncStatusBadge } from "@/components/sync/SyncDisplay";
+import { RunHistoryDots, RunHistoryList, SyncFacts, SyncRoute, SyncStatusBadge } from "@/components/sync/SyncDisplay";
 import { cn } from "@/lib/utils";
 
 const SUMMARY: SyncStatus[] = ["success", "conflict", "failed", "running"];
@@ -53,14 +53,14 @@ export default function SyncStatusBoard() {
           {syncs.map(s => (
             <Card key={s.id}>
               <CardHeader className="pb-2 flex flex-col gap-1.5">
+                <CardTitle className="text-base font-normal"><SyncRoute sync={s} /></CardTitle>
                 <div className="flex flex-wrap items-center gap-2">
-                  <CardTitle className="text-base truncate">{s.name}</CardTitle>
                   <SyncStatusBadge status={s.lastStatus} />
                   {!s.enabled && <Badge variant="outline" className="gap-1"><PauseCircle className="h-3 w-3" />Paused</Badge>}
                 </div>
-                <SyncRoute sync={s} />
               </CardHeader>
               <CardContent className="flex flex-col gap-3">
+                <SyncFacts sync={s} />
                 {s.lastMessage && <p className="text-sm break-words">{s.lastMessage}</p>}
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex flex-col gap-1.5">
@@ -79,13 +79,11 @@ export default function SyncStatusBoard() {
 
       <Dialog open={selected !== null} onOpenChange={() => setSelected(null)}>
         <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
-          <DialogHeader><DialogTitle>{selected?.name}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Synchronization details</DialogTitle></DialogHeader>
           {selected && (
             <div className="flex flex-col gap-3">
               <SyncRoute sync={selected} />
-              <p className={muted}>
-                {selected.direction === "two_way" ? "Two-way" : "One-way"} · {selected.branches || "all branches"}{selected.syncTags ? " · tags" : ""} · every {selected.intervalMinutes}m
-              </p>
+              <SyncFacts sync={selected} />
               <RunHistoryList runs={selected.recentRuns} />
             </div>
           )}

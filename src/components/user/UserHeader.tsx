@@ -25,7 +25,7 @@ export default function UserHeader({ user, platform }: Props) {
   return (
     <header className="sidebar-panel sticky top-0 z-40 border-b">
       <div className="mx-auto w-full max-w-5xl h-14 px-4 md:px-8 flex items-center justify-between gap-4">
-        <Link href="/dashboard" className="flex items-center gap-2.5 min-w-0">
+        <Link href="/user" className="flex items-center gap-2.5 min-w-0">
           <span
             className="flex h-8 w-8 items-center justify-center rounded-lg shrink-0 relative"
             style={{ background: "color-mix(in srgb, var(--color-primary) 12%, transparent)" }}
@@ -58,7 +58,7 @@ export default function UserHeader({ user, platform }: Props) {
               </div>
               <DropdownMenu.Separator className="my-1 h-px bg-border" />
               <DropdownMenu.Item asChild className={itemClass}>
-                <Link href="/dashboard"><LayoutDashboard className="h-4 w-4 opacity-60" />Dashboard</Link>
+                <Link href="/user"><LayoutDashboard className="h-4 w-4 opacity-60" />Dashboard</Link>
               </DropdownMenu.Item>
               {user.isAdmin && (
                 <DropdownMenu.Item asChild className={itemClass}>

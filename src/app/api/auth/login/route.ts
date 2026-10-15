@@ -6,6 +6,7 @@ import { users, permission_groups } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { createSession } from "@/lib/auth";
 import { isRateLimited } from "@/lib/rate-limit";
+import { homeForRole, roleFromPermissions, type Role } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
 
 const schema = z.object({ username: z.string().min(1), password: z.string().min(1) });
@@ -77,22 +78,19 @@ export async function POST(req: NextRequest) {
   const valid = await bcrypt.compare(password, user.passwordHash);
   if (!valid) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
 
-  // Determine redirect based on group permissions
-  let isAdmin = false;
+  let role: Role | null = null;
   if (user.groupId) {
     const [group] = await db
       .select({ permissions: permission_groups.permissions })
       .from(permission_groups)
       .where(eq(permission_groups.id, user.groupId))
       .limit(1);
-    if (group) {
-      const perms = JSON.parse(group.permissions || "[]") as string[];
-      isAdmin = perms.includes("administrator");
-    }
+    role = roleFromPermissions(group?.permissions);
   }
+  if (!role) return NextResponse.json({ error: "Your account has no access. Ask an administrator to assign it to a group." }, { status: 403 });
 
   const token = await createSession(user.id);
-  const redirectPath = isAdmin ? "/admin" : "/dashboard";
+  const redirectPath = homeForRole(role);
   const isSecure = req.headers.get("x-forwarded-proto") === "https";
   await logAudit({ userEmail: user.username ?? user.email, action: "login", resource: "auth", ip });
 

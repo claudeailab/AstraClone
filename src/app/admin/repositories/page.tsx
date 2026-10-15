@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +18,8 @@ interface Repo {
   defaultBranch: string | null; connectionName: string; connectionUsername: string; syncCount: number;
 }
 
+interface AccountRepo { fullName: string; isPrivate: boolean; canPush: boolean; addedId: number | null }
+
 const emptyForm = { id: 0, connectionId: "", repo: "" };
 
 export default function RepositoriesPage() {
@@ -29,10 +30,12 @@ export default function RepositoriesPage() {
   const [deleteTarget, setDeleteTarget] = useState<Repo | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [accountRepos, setAccountRepos] = useState<AccountRepo[] | null>(null);
+  const [reposError, setReposError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [rr, ar] = await Promise.all([fetch("/api/admin/management/repositories"), fetch("/api/admin/management/connections")]);
+      const [rr, ar] = await Promise.all([fetch("/api/admin/repositories"), fetch("/api/admin/accounts")]);
       const [rd, ad] = await Promise.all([rr.json(), ar.json()]);
       setRepos(rd.repositories ?? []);
       setAccounts(ad.connections ?? []);
@@ -41,16 +44,32 @@ export default function RepositoriesPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  function openNew() {
-    setForm({ ...emptyForm, connectionId: accounts.length === 1 ? String(accounts[0].id) : "" });
+  async function loadAccountRepos(connectionId: string) {
+    setAccountRepos(null);
+    setReposError(null);
+    if (!connectionId) return;
+    const r = await fetch(`/api/admin/accounts/repos?id=${connectionId}`);
+    const d = await r.json();
+    if (!r.ok) { setReposError(d.error ?? "Could not load repositories"); setAccountRepos([]); return; }
+    setAccountRepos(d.repos ?? []);
+  }
+
+  function openForm(next: typeof emptyForm) {
+    setForm(next);
     setDialogOpen(true);
+    loadAccountRepos(next.connectionId);
+  }
+
+  function selectAccount(connectionId: string) {
+    setForm(f => ({ ...f, connectionId, repo: "" }));
+    loadAccountRepos(connectionId);
   }
 
   async function handleSave() {
     setSaving(true);
     try {
       const body = { connectionId: Number(form.connectionId), repo: form.repo, ...(form.id ? { id: form.id } : {}) };
-      const r = await fetch("/api/admin/management/repositories", {
+      const r = await fetch("/api/admin/repositories", {
         method: form.id ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
       });
       const d = await r.json();
@@ -62,7 +81,7 @@ export default function RepositoriesPage() {
   }
 
   async function handleDelete(repo: Repo) {
-    const r = await fetch(`/api/admin/management/repositories?id=${repo.id}`, { method: "DELETE" });
+    const r = await fetch(`/api/admin/repositories?id=${repo.id}`, { method: "DELETE" });
     const d = await r.json();
     if (!r.ok) { toast.error(d.error ?? "Delete failed"); return; }
     toast.success("Repository removed");
@@ -75,15 +94,15 @@ export default function RepositoriesPage() {
       <div className={pageInner}>
         <div className="flex items-center justify-between gap-4 mb-2">
           <h1 className={pageTitle}>Repositories</h1>
-          <Button size="sm" onClick={openNew} disabled={!accounts.length}><Plus className="h-4 w-4 mr-1" /> Add Repository</Button>
+          <Button size="sm" onClick={() => openForm({ ...emptyForm, connectionId: accounts.length === 1 ? String(accounts[0].id) : "" })} disabled={!accounts.length}><Plus className="h-4 w-4 mr-1" /> Add Repository</Button>
         </div>
-        <p className={`${muted} mb-6`}>Repositories available as a source or destination. Access is verified with the selected account when saving.</p>
+        <p className={`${muted} mb-6`}>Repositories available as a source or destination. Pick an account to choose from the repositories it can access.</p>
 
         {loading ? (
           <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin" /></div>
         ) : !accounts.length ? (
           <p className={`text-center py-12 ${muted}`}>
-            Add a <Link href="/admin/management/accounts" className="text-primary underline-offset-4 hover:underline">GitHub account</Link> first.
+            Add a <Link href="/admin/accounts" className="text-primary underline-offset-4 hover:underline">GitHub account</Link> first.
           </p>
         ) : repos.length === 0 ? (
           <p className={`text-center py-12 ${muted}`}>No repositories yet.</p>
@@ -99,7 +118,7 @@ export default function RepositoriesPage() {
                     <p className="text-sm text-muted-foreground truncate">via {r.connectionName} (@{r.connectionUsername})</p>
                   </div>
                   <div className="flex gap-1 shrink-0">
-                    <Button size="icon" variant="ghost" aria-label="Edit" onClick={() => { setForm({ id: r.id, connectionId: String(r.connectionId), repo: `${r.owner}/${r.name}` }); setDialogOpen(true); }}><Pencil className="h-4 w-4" /></Button>
+                    <Button size="icon" variant="ghost" aria-label="Edit" onClick={() => openForm({ id: r.id, connectionId: String(r.connectionId), repo: `${r.owner}/${r.name}` })}><Pencil className="h-4 w-4" /></Button>
                     <Button size="icon" variant="ghost" aria-label="Delete" onClick={() => setDeleteTarget(r)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                   </div>
                 </CardHeader>
@@ -122,7 +141,7 @@ export default function RepositoriesPage() {
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
                 <Label>GitHub account</Label>
-                <Select value={form.connectionId} onValueChange={v => setForm(f => ({ ...f, connectionId: v }))}>
+                <Select value={form.connectionId} onValueChange={selectAccount}>
                   <SelectTrigger><SelectValue placeholder="Select an account" /></SelectTrigger>
                   <SelectContent>
                     {accounts.map(a => <SelectItem key={a.id} value={String(a.id)}>{a.name} (@{a.username})</SelectItem>)}
@@ -131,7 +150,22 @@ export default function RepositoriesPage() {
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label>Repository</Label>
-                <Input value={form.repo} onChange={e => setForm(f => ({ ...f, repo: e.target.value }))} placeholder="owner/name or https://github.com/owner/name" className="font-mono" autoComplete="off" />
+                <Select value={form.repo} onValueChange={v => setForm(f => ({ ...f, repo: v }))} disabled={!form.connectionId || !accountRepos?.length}>
+                  <SelectTrigger className="font-mono">
+                    <SelectValue placeholder={!form.connectionId ? "Select an account first" : accountRepos === null ? "Loading repositories…" : accountRepos.length ? "Select a repository" : "No repositories found"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accountRepos?.map(r => {
+                      const taken = r.addedId !== null && r.addedId !== form.id;
+                      return (
+                        <SelectItem key={r.fullName} value={r.fullName} disabled={taken} className="font-mono">
+                          {r.fullName}{r.isPrivate ? " · private" : ""}{r.canPush ? "" : " · read only"}{taken ? " · added" : ""}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+                {reposError && <p className="text-xs text-destructive">{reposError}</p>}
                 {form.id ? <p className="text-xs text-muted-foreground">Saving re-checks access and refreshes the details.</p> : null}
               </div>
             </div>

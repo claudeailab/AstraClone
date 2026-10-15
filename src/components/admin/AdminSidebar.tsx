@@ -33,9 +33,9 @@ export default function AdminSidebar({ user, features, platform }: Props) {
   const dashboardItem: NavItem = { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true };
 
   const managementItems: NavItem[] = [
-    { href: "/admin/management/accounts", label: "GitHub Accounts", icon: KeyRound },
-    { href: "/admin/management/repositories", label: "Repositories", icon: FolderGit2 },
-    { href: "/admin/management/syncs", label: "Synchronizations", icon: RefreshCw },
+    { href: "/admin/accounts", label: "GitHub Accounts", icon: KeyRound },
+    { href: "/admin/repositories", label: "Repositories", icon: FolderGit2 },
+    { href: "/admin/syncs", label: "Synchronizations", icon: RefreshCw },
   ];
 
   const systemItems: NavItem[] = [

@@ -5,12 +5,12 @@ Keeps GitHub repositories in sync. Add GitHub accounts and repositories, define 
 ## Features
 
 ### Repository Synchronization
-- **Admin → Management → GitHub Accounts**: store personal access tokens (encrypted, verified against GitHub on save, "Test" button)
-- **Admin → Management → Repositories**: add repositories as `owner/name` or a github.com URL; access, visibility and push permission are verified with the chosen account
-- **Admin → Management → Synchronizations**: pick source and destination, direction, branch filter (comma-separated, `*` wildcards), tag sync, check interval, enable/pause, optional force push (one-way only); "Run now" and full run history with per-branch details
+- **GitHub Accounts** (`/admin/accounts`): paste a personal access token — the GitHub username is detected automatically; tokens are encrypted and verified on save ("Test" button)
+- **Repositories** (`/admin/repositories`): pick an account, then pick from the repositories that account can access — no typing; visibility and push permission are recorded
+- **Synchronizations** (`/admin/syncs`): everything is chosen from lists — source, destination, direction, branches (all, or a checklist loaded from GitHub), check interval, tags, enable/pause, optional force push (one-way only); "Run now" and full run history with per-branch details
 - **One-way**: new branches and tags are created on the destination and branches are fast-forwarded; if the destination has commits the source doesn't, the branch is reported as a conflict and left untouched (unless force push is on)
 - **Two-way**: whichever side is ahead is fast-forwarded into the other; new branches and tags are copied both ways; branches changed on both sides are reported as conflicts and never overwritten
-- **User dashboard** (`/dashboard`): live status of every synchronization (in sync / conflict / failed / running), last result, next run and recent run history
+- **User area** (`/user`): every synchronization with its status (in sync / conflict / failed / running), direction, branches, interval, last result, next run and recent run history
 - Branches are never deleted; credentials are passed to `git` via environment, never via the command line or URLs
 
 **Token permissions:** classic PAT with `repo` scope, or fine-grained PAT with Contents read/write on the repositories. Add the `workflow` scope (classic) or Workflows write (fine-grained) if synchronized branches change files under `.github/workflows`.
@@ -18,7 +18,7 @@ Keeps GitHub repositories in sync. Add GitHub accounts and repositories, define 
 ### Auth & Users
 - Local email/password auth (bcrypt, session tokens)
 - Azure AD / Microsoft 365 SSO (MSAL + Microsoft Graph)
-- Permission groups with granular access control
+- Two roles, assigned through groups: **Administrator** (admin area, `/admin`) and **User** (user area, `/user`); accounts without a role cannot sign in
 - Auto-seeds first admin from environment variables
 - In-memory rate limiting on login
 

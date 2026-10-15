@@ -6,6 +6,14 @@ export const SYNC_DIRECTIONS = [
 ] as const;
 export type SyncDirection = typeof SYNC_DIRECTIONS[number]["value"];
 
+export const SYNC_INTERVALS = [5, 15, 30, 60, 180, 360, 720, 1440];
+
+export function intervalLabel(minutes: number) {
+  if (minutes % 1440 === 0) return minutes === 1440 ? "Every day" : `Every ${minutes / 1440} days`;
+  if (minutes % 60 === 0) return minutes === 60 ? "Every hour" : `Every ${minutes / 60} hours`;
+  return `Every ${minutes} minutes`;
+}
+
 export type SyncStatus = "pending" | "running" | "success" | "conflict" | "failed";
 
 export const SYNC_STATUS: Record<SyncStatus, { label: string; className: string; dot: string }> = {
@@ -35,7 +43,6 @@ export interface SyncRunSummary { id: number; status: string; triggeredBy: strin
 
 export interface SyncOverview {
   id: number;
-  name: string;
   sourceRepoId: number;
   destRepoId: number;
   source: string;
@@ -51,6 +58,10 @@ export interface SyncOverview {
   lastRunAt: string | null;
   running: boolean;
   recentRuns: SyncRunSummary[];
+}
+
+export function routeLabel(s: Pick<SyncOverview, "source" | "destination" | "direction">) {
+  return `${s.source} ${s.direction === "two_way" ? "↔" : "→"} ${s.destination}`;
 }
 
 export function nextRunAt(s: Pick<SyncOverview, "enabled" | "lastRunAt" | "intervalMinutes">): string | null {

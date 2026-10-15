@@ -90,5 +90,14 @@ Always prefer `mcp__github__*` tools over curl for GitHub API calls — the MCP 
 - Rules: fast-forward only; one-way may force-push when `forcePush`; two-way never forces; branches never deleted; conflicts reported, not resolved.
 - GitHub REST calls live in `src/lib/github.ts` (`verifyToken`, `inspectRepo`, `parseRepoRef`).
 - Shared client-safe types/status styles: `src/lib/sync-shared.ts`; shared UI: `src/components/sync/SyncDisplay.tsx` (used by admin and user views).
-- Admin pages: `/admin/management/{accounts,repositories,syncs}`; user page: `/dashboard` (`/api/syncs`, any signed-in user). Deleting an account/repository in use returns 409.
+- Admin pages: `/admin/{accounts,repositories,syncs}` (APIs under `/api/admin/{accounts,repositories,syncs}`); user page: `/user` (`/api/syncs`, any user with a role). Deleting an account/repository in use returns 409.
+- No free-text inputs in sync/repository forms: repositories come from `/api/admin/accounts/repos?id=` (GitHub `/user/repos`), branches from `/api/admin/repositories/branches?id=` (union of both repos for two-way), intervals from `SYNC_INTERVALS`. Syncs have no name — they are identified by their route (`routeLabel`/`describeRoute`); one sync per source→destination pair.
+- Account name defaults to the GitHub login detected from the token; there is no username input.
 - User area header (`src/components/user/UserHeader.tsx`) holds the profile menu with the version.
+
+## Roles
+
+- Exactly two roles, defined in `src/lib/permissions.ts` (`ROLES`): `administrator` → `/admin`, `user` → `/user`. A group stores one role (`permissions` column holds `["administrator"]` or `["user"]`).
+- `roleFromPermissions()` is the only parser; `homeForRole()` decides post-login redirects (local login and Azure SSO). No role → login refused (403 / `no_access`).
+- Guards: `requireAdmin()` for admin pages/APIs, `requireUserArea()` for the user area (admins may view it too).
+- Startup normalizes any legacy group permissions to one of the two roles.

@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { users, permission_groups } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { createSession } from "@/lib/auth";
+import { homeForRole, roleFromPermissions } from "@/lib/permissions";
 import { logAudit } from "@/lib/audit";
 
 function decodeJwtPayload(token: string): Record<string, unknown> {
@@ -71,34 +72,26 @@ export async function GET(req: NextRequest) {
     return fail("not_provisioned");
   }
 
-  let isAdmin = false;
-  if (user.groupId) {
-    const [group] = await db
-      .select({ permissions: permission_groups.permissions })
-      .from(permission_groups)
-      .where(eq(permission_groups.id, user.groupId))
-      .limit(1);
-    if (group) {
-      const perms = JSON.parse(group.permissions || "[]") as string[];
-      if (!perms.includes("access_dashboard") && !perms.includes("administrator")) {
-        console.error(`[azure-sso] no_access: user=${user.email} groupId=${user.groupId} perms=[${perms.join(",")}] — missing access_dashboard or administrator`);
-        return fail("no_access");
-      }
-      isAdmin = perms.includes("administrator");
-    } else {
-      console.error(`[azure-sso] no_access: user=${user.email} groupId=${user.groupId} — group record not found`);
-      return fail("no_access");
-    }
-  } else {
+  if (!user.groupId) {
     console.error(`[azure-sso] no_group: user=${user.email} — no group assigned`);
     return fail("no_group");
+  }
+  const [group] = await db
+    .select({ permissions: permission_groups.permissions })
+    .from(permission_groups)
+    .where(eq(permission_groups.id, user.groupId))
+    .limit(1);
+  const role = roleFromPermissions(group?.permissions);
+  if (!role) {
+    console.error(`[azure-sso] no_access: user=${user.email} groupId=${user.groupId} — group missing or has no role`);
+    return fail("no_access");
   }
 
   const token = await createSession(user.id);
   await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
   await logAudit({ userEmail: user.email, action: "login", resource: "auth", detail: "azure_sso" });
 
-  const redirectPath = isAdmin ? "/admin" : "/dashboard";
+  const redirectPath = homeForRole(role);
   const isSecure = req.headers.get("x-forwarded-proto") === "https";
 
   const res = NextResponse.redirect(`${base}${redirectPath}`);

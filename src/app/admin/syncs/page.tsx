@@ -4,24 +4,31 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Plus, Pencil, Trash2, Play, History, Clock, GitBranch, Tag, PauseCircle } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, Play, History, PauseCircle, Check } from "lucide-react";
 import { pageWrapper, pageInner, pageTitle, muted } from "@/lib/ui-conventions";
-import { SYNC_DIRECTIONS, nextRunAt, relativeTime, type SyncDirection, type SyncOverview, type SyncRunSummary } from "@/lib/sync-shared";
-import { RunHistoryDots, RunHistoryList, SyncRoute, SyncStatusBadge } from "@/components/sync/SyncDisplay";
+import { SYNC_DIRECTIONS, SYNC_INTERVALS, intervalLabel, nextRunAt, relativeTime, routeLabel, type SyncDirection, type SyncOverview, type SyncRunSummary } from "@/lib/sync-shared";
+import { RunHistoryDots, RunHistoryList, SyncFacts, SyncRoute, SyncStatusBadge } from "@/components/sync/SyncDisplay";
 
 interface Repo { id: number; owner: string; name: string; canPush: boolean; connectionName: string }
 
 const emptyForm = {
-  id: 0, name: "", sourceRepoId: "", destRepoId: "", direction: "one_way" as SyncDirection,
-  branches: "", syncTags: true, forcePush: false, intervalMinutes: "15", enabled: true,
+  id: 0, sourceRepoId: "", destRepoId: "", direction: "one_way" as SyncDirection,
+  branches: [] as string[], allBranches: true, syncTags: true, forcePush: false, intervalMinutes: "15", enabled: true,
 };
+type SyncForm = typeof emptyForm;
+
+async function fetchBranches(repoId: string): Promise<string[]> {
+  const r = await fetch(`/api/admin/repositories/branches?id=${repoId}`);
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error ?? "Could not load branches");
+  return d.branches ?? [];
+}
 
 export default function SyncsPage() {
   const [syncs, setSyncs] = useState<SyncOverview[]>([]);
@@ -32,10 +39,12 @@ export default function SyncsPage() {
   const [history, setHistory] = useState<{ sync: SyncOverview; runs: (SyncRunSummary & { details: string | null })[] | null } | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [branchOptions, setBranchOptions] = useState<string[] | null>(null);
+  const [branchError, setBranchError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [sr, rr] = await Promise.all([fetch("/api/admin/management/syncs"), fetch("/api/admin/management/repositories")]);
+      const [sr, rr] = await Promise.all([fetch("/api/admin/syncs"), fetch("/api/admin/repositories")]);
       const [sd, rd] = await Promise.all([sr.json(), rr.json()]);
       setSyncs(sd.syncs ?? []);
       setRepos(rd.repositories ?? []);
@@ -50,12 +59,44 @@ export default function SyncsPage() {
     return () => clearInterval(t);
   }, [load, anyRunning]);
 
-  function openEdit(s: SyncOverview) {
-    setForm({
-      id: s.id, name: s.name, sourceRepoId: String(s.sourceRepoId), destRepoId: String(s.destRepoId), direction: s.direction,
-      branches: s.branches, syncTags: s.syncTags, forcePush: s.forcePush, intervalMinutes: String(s.intervalMinutes), enabled: s.enabled,
-    });
+  async function loadBranches(f: SyncForm) {
+    setBranchOptions(null);
+    setBranchError(null);
+    if (!f.sourceRepoId || (f.direction === "two_way" && !f.destRepoId)) return;
+    try {
+      const lists = await Promise.all([
+        fetchBranches(f.sourceRepoId),
+        ...(f.direction === "two_way" ? [fetchBranches(f.destRepoId)] : []),
+      ]);
+      setBranchOptions([...new Set(lists.flat())].sort());
+    } catch (e) {
+      setBranchError(e instanceof Error ? e.message : "Could not load branches");
+      setBranchOptions([]);
+    }
+  }
+
+  function update(patch: Partial<SyncForm>) {
+    const next = { ...form, ...patch };
+    setForm(next);
+    if ("sourceRepoId" in patch || "destRepoId" in patch || "direction" in patch) loadBranches(next);
+  }
+
+  function openForm(next: SyncForm) {
+    setForm(next);
     setDialogOpen(true);
+    loadBranches(next);
+  }
+
+  function openEdit(s: SyncOverview) {
+    const branches = s.branches.split(",").map(b => b.trim()).filter(Boolean);
+    openForm({
+      id: s.id, sourceRepoId: String(s.sourceRepoId), destRepoId: String(s.destRepoId), direction: s.direction,
+      branches, allBranches: !branches.length, syncTags: s.syncTags, forcePush: s.forcePush, intervalMinutes: String(s.intervalMinutes), enabled: s.enabled,
+    });
+  }
+
+  function toggleBranch(b: string) {
+    setForm(f => ({ ...f, branches: f.branches.includes(b) ? f.branches.filter(x => x !== b) : [...f.branches, b] }));
   }
 
   async function handleSave() {
@@ -63,10 +104,10 @@ export default function SyncsPage() {
     try {
       const body = {
         ...(form.id ? { id: form.id } : {}),
-        name: form.name, sourceRepoId: Number(form.sourceRepoId), destRepoId: Number(form.destRepoId), direction: form.direction,
-        branches: form.branches, syncTags: form.syncTags, forcePush: form.forcePush, intervalMinutes: Number(form.intervalMinutes), enabled: form.enabled,
+        sourceRepoId: Number(form.sourceRepoId), destRepoId: Number(form.destRepoId), direction: form.direction,
+        branches: form.allBranches ? "" : form.branches.join(", "), syncTags: form.syncTags, forcePush: form.forcePush, intervalMinutes: Number(form.intervalMinutes), enabled: form.enabled,
       };
-      const r = await fetch("/api/admin/management/syncs", {
+      const r = await fetch("/api/admin/syncs", {
         method: form.id ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
       });
       const d = await r.json();
@@ -78,24 +119,24 @@ export default function SyncsPage() {
   }
 
   async function handleRun(s: SyncOverview) {
-    const r = await fetch("/api/admin/management/syncs/run", {
+    const r = await fetch("/api/admin/syncs/run", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: s.id }),
     });
     const d = await r.json();
     if (!r.ok) { toast.error(d.error ?? "Could not start"); return; }
-    toast.success(`Started ${s.name}`);
+    toast.success(`Started ${routeLabel(s)}`);
     load();
   }
 
   async function openHistory(s: SyncOverview) {
     setHistory({ sync: s, runs: null });
-    const r = await fetch(`/api/admin/management/syncs/runs?id=${s.id}`);
+    const r = await fetch(`/api/admin/syncs/runs?id=${s.id}`);
     const d = await r.json();
     setHistory({ sync: s, runs: d.runs ?? [] });
   }
 
   async function handleDelete(s: SyncOverview) {
-    const r = await fetch(`/api/admin/management/syncs?id=${s.id}`, { method: "DELETE" });
+    const r = await fetch(`/api/admin/syncs?id=${s.id}`, { method: "DELETE" });
     if (!r.ok) { toast.error("Delete failed"); return; }
     toast.success("Synchronization deleted");
     setDeleteTarget(null);
@@ -103,16 +144,17 @@ export default function SyncsPage() {
   }
 
   const repoLabel = (r: Repo) => `${r.owner}/${r.name} · ${r.connectionName}${r.canPush ? "" : " (read only)"}`;
-  const interval = Number(form.intervalMinutes);
-  const formValid = form.name.trim() && form.sourceRepoId && form.destRepoId && form.sourceRepoId !== form.destRepoId
-    && Number.isInteger(interval) && interval >= 1 && interval <= 1440;
+  const formValid = form.sourceRepoId && form.destRepoId && form.sourceRepoId !== form.destRepoId
+    && (form.allBranches || form.branches.length > 0);
+  const intervalOptions = SYNC_INTERVALS.includes(Number(form.intervalMinutes)) ? SYNC_INTERVALS : [...SYNC_INTERVALS, Number(form.intervalMinutes)].sort((a, b) => a - b);
+  const branchChoices = [...new Set([...(branchOptions ?? []), ...form.branches])].sort();
 
   return (
     <div className={pageWrapper}>
       <div className={pageInner}>
         <div className="flex items-center justify-between gap-4 mb-2">
           <h1 className={pageTitle}>Synchronizations</h1>
-          <Button size="sm" onClick={() => { setForm(emptyForm); setDialogOpen(true); }} disabled={repos.length < 2}><Plus className="h-4 w-4 mr-1" /> New Sync</Button>
+          <Button size="sm" onClick={() => openForm(emptyForm)} disabled={repos.length < 2}><Plus className="h-4 w-4 mr-1" /> New Sync</Button>
         </div>
         <p className={`${muted} mb-6`}>Choose what synchronizes where, in which direction and how often.</p>
 
@@ -120,7 +162,7 @@ export default function SyncsPage() {
           <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin" /></div>
         ) : repos.length < 2 && !syncs.length ? (
           <p className={`text-center py-12 ${muted}`}>
-            Add at least two <Link href="/admin/management/repositories" className="text-primary underline-offset-4 hover:underline">repositories</Link> first.
+            Add at least two <Link href="/admin/repositories" className="text-primary underline-offset-4 hover:underline">repositories</Link> first.
           </p>
         ) : syncs.length === 0 ? (
           <p className={`text-center py-12 ${muted}`}>No synchronizations yet.</p>
@@ -130,12 +172,11 @@ export default function SyncsPage() {
               <Card key={s.id}>
                 <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2">
                   <div className="min-w-0 flex flex-col gap-1.5">
+                    <CardTitle className="text-base font-normal"><SyncRoute sync={s} /></CardTitle>
                     <div className="flex flex-wrap items-center gap-2">
-                      <CardTitle className="text-base truncate">{s.name}</CardTitle>
                       <SyncStatusBadge status={s.lastStatus} />
                       {!s.enabled && <Badge variant="outline" className="gap-1"><PauseCircle className="h-3 w-3" />Paused</Badge>}
                     </div>
-                    <SyncRoute sync={s} />
                   </div>
                   <div className="flex gap-1 shrink-0">
                     <Button size="icon" variant="ghost" aria-label="Edit" onClick={() => openEdit(s)}><Pencil className="h-4 w-4" /></Button>
@@ -143,12 +184,7 @@ export default function SyncsPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-3">
-                  <div className="flex flex-wrap gap-1.5">
-                    <Badge variant="secondary" className="gap-1"><Clock className="h-3 w-3" />Every {s.intervalMinutes}m</Badge>
-                    <Badge variant="secondary" className="gap-1 font-mono"><GitBranch className="h-3 w-3" />{s.branches || "all branches"}</Badge>
-                    {s.syncTags && <Badge variant="secondary" className="gap-1"><Tag className="h-3 w-3" />Tags</Badge>}
-                    {s.forcePush && <Badge className="border-transparent bg-amber-500/15 text-amber-700 dark:text-amber-400">Force push</Badge>}
-                  </div>
+                  <SyncFacts sync={s} />
                   {s.lastMessage && <p className="text-sm break-words">{s.lastMessage}</p>}
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex flex-col gap-1.5">
@@ -174,21 +210,17 @@ export default function SyncsPage() {
           <DialogContent className="max-w-lg max-h-[90dvh] overflow-y-auto">
             <DialogHeader><DialogTitle>{form.id ? "Edit Synchronization" : "New Synchronization"}</DialogTitle></DialogHeader>
             <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1.5">
-                <Label>Name</Label>
-                <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Mirror app to backup org" />
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1.5">
                   <Label>Source</Label>
-                  <Select value={form.sourceRepoId} onValueChange={v => setForm(f => ({ ...f, sourceRepoId: v }))}>
+                  <Select value={form.sourceRepoId} onValueChange={v => update({ sourceRepoId: v, branches: [] })}>
                     <SelectTrigger><SelectValue placeholder="Select repository" /></SelectTrigger>
                     <SelectContent>{repos.map(r => <SelectItem key={r.id} value={String(r.id)}>{repoLabel(r)}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <Label>Destination</Label>
-                  <Select value={form.destRepoId} onValueChange={v => setForm(f => ({ ...f, destRepoId: v }))}>
+                  <Select value={form.destRepoId} onValueChange={v => update({ destRepoId: v })}>
                     <SelectTrigger><SelectValue placeholder="Select repository" /></SelectTrigger>
                     <SelectContent>{repos.filter(r => String(r.id) !== form.sourceRepoId).map(r => <SelectItem key={r.id} value={String(r.id)}>{repoLabel(r)}</SelectItem>)}</SelectContent>
                   </Select>
@@ -196,7 +228,7 @@ export default function SyncsPage() {
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label>Direction</Label>
-                <Select value={form.direction} onValueChange={v => setForm(f => ({ ...f, direction: v as SyncDirection }))}>
+                <Select value={form.direction} onValueChange={v => update({ direction: v as SyncDirection })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>{SYNC_DIRECTIONS.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}</SelectContent>
                 </Select>
@@ -206,16 +238,50 @@ export default function SyncsPage() {
                     : "New commits flow whichever way is ahead. Branches changed on both sides are reported as conflicts and left untouched."}
                 </p>
               </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="flex flex-col gap-1.5">
-                  <Label>Branches</Label>
-                  <Input value={form.branches} onChange={e => setForm(f => ({ ...f, branches: e.target.value }))} placeholder="All branches" className="font-mono" />
-                  <p className="text-xs text-muted-foreground">Comma-separated, <span className="font-mono">*</span> wildcard, e.g. <span className="font-mono">main, release/*</span></p>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label>Check every (minutes)</Label>
-                  <Input type="number" min={1} max={1440} value={form.intervalMinutes} onChange={e => setForm(f => ({ ...f, intervalMinutes: e.target.value }))} />
-                </div>
+              <div className="flex flex-col gap-1.5">
+                <Label>Check every</Label>
+                <Select value={form.intervalMinutes} onValueChange={v => setForm(f => ({ ...f, intervalMinutes: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{intervalOptions.map(m => <SelectItem key={m} value={String(m)}>{intervalLabel(m)}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="flex items-center justify-between gap-4">
+                  <span className="text-sm font-medium">All branches</span>
+                  <Switch checked={form.allBranches} onCheckedChange={v => setForm(f => ({ ...f, allBranches: v }))} />
+                </label>
+                {!form.allBranches && (
+                  !form.sourceRepoId ? (
+                    <p className="text-xs text-muted-foreground">Select a source to choose branches.</p>
+                  ) : branchOptions === null ? (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />Loading branches…</div>
+                  ) : (
+                    <>
+                      {branchError && <p className="text-xs text-destructive">{branchError}</p>}
+                      <div className="rounded-lg border divide-y divide-border max-h-56 overflow-y-auto">
+                        {branchChoices.map(b => {
+                          const checked = form.branches.includes(b);
+                          return (
+                            <button
+                              key={b}
+                              type="button"
+                              role="checkbox"
+                              aria-checked={checked}
+                              onClick={() => toggleBranch(b)}
+                              className={`w-full flex items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-secondary/50 ${checked ? "bg-primary/5" : ""}`}
+                            >
+                              <span className={`h-4 w-4 rounded border shrink-0 flex items-center justify-center transition-colors ${checked ? "bg-primary border-primary text-primary-foreground" : "border-border"}`}>
+                                {checked && <Check className="h-3 w-3" />}
+                              </span>
+                              <span className="text-sm font-mono truncate">{b}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="text-xs text-muted-foreground">{form.branches.length} selected{form.direction === "two_way" ? " · from both repositories" : " · from the source"}</p>
+                    </>
+                  )
+                )}
               </div>
               <div className="flex flex-col gap-3 rounded-lg border p-3">
                 <label className="flex items-center justify-between gap-4">
@@ -248,7 +314,8 @@ export default function SyncsPage() {
 
         <Dialog open={history !== null} onOpenChange={() => setHistory(null)}>
           <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
-            <DialogHeader><DialogTitle>{history?.sync.name} — History</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>History</DialogTitle></DialogHeader>
+            {history && <SyncRoute sync={history.sync} />}
             {history?.runs ? <RunHistoryList runs={history.runs} /> : <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin" /></div>}
           </DialogContent>
         </Dialog>
@@ -256,7 +323,7 @@ export default function SyncsPage() {
         <Dialog open={deleteTarget !== null} onOpenChange={() => setDeleteTarget(null)}>
           <DialogContent>
             <DialogHeader><DialogTitle>Delete Synchronization</DialogTitle></DialogHeader>
-            <p className="text-sm">Delete <span className="font-medium">{deleteTarget?.name}</span> and its run history? The repositories are not affected.</p>
+            <p className="text-sm">Delete <span className="font-mono font-medium">{deleteTarget && routeLabel(deleteTarget)}</span> and its run history? The repositories are not affected.</p>
             <DialogFooter>
               <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
               <Button variant="destructive" onClick={() => deleteTarget && handleDelete(deleteTarget)}>Delete</Button>

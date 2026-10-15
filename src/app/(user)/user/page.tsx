@@ -1,9 +1,9 @@
-import { requireSession } from "@/lib/auth";
+import { requireUserArea } from "@/lib/auth";
 import { pageWrapper, pageInner, pageTitle, muted, sectionGap } from "@/lib/ui-conventions";
 import SyncStatusBoard from "@/components/user/SyncStatusBoard";
 
-export default async function DashboardPage() {
-  const user = await requireSession();
+export default async function UserPage() {
+  const user = await requireUserArea();
   return (
     <div className={pageWrapper}>
       <div className={`${pageInner} ${sectionGap}`}>

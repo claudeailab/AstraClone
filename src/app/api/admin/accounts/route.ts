@@ -9,14 +9,12 @@ import { verifyToken } from "@/lib/github";
 import { logAudit } from "@/lib/audit";
 
 const createSchema = z.object({
-  name: z.string().trim().min(1).max(255),
-  username: z.string().trim().max(39).optional().default(""),
+  name: z.string().trim().max(255).optional().default(""),
   token: z.string().trim().min(1).max(1000),
 });
 const updateSchema = z.object({
   id: z.number().int().positive(),
   name: z.string().trim().min(1).max(255),
-  username: z.string().trim().max(39).optional().default(""),
   token: z.string().trim().max(1000).optional().default(""),
 });
 
@@ -24,10 +22,9 @@ function clientIp(req: NextRequest) {
   return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? req.headers.get("x-real-ip") ?? "unknown";
 }
 
-async function checkToken(token: string, username: string) {
+async function checkToken(token: string) {
   const v = await verifyToken(token);
   if (!v.ok) return { error: v.error };
-  if (username && username.toLowerCase() !== v.login.toLowerCase()) return { error: `Token belongs to "${v.login}", not "${username}"` };
   return { login: v.login };
 }
 
@@ -46,9 +43,10 @@ export async function POST(req: NextRequest) {
   const admin = await requireAdmin();
   const parsed = createSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
-  const { name, username, token } = parsed.data;
-  const check = await checkToken(token, username);
+  const { token } = parsed.data;
+  const check = await checkToken(token);
   if ("error" in check) return NextResponse.json({ error: check.error }, { status: 400 });
+  const name = parsed.data.name || check.login;
   await db.insert(github_connections).values({ name, username: check.login, token: encrypt(token) });
   await logAudit({ userEmail: admin.email, action: "create", resource: "github_connection", detail: `name=${name}; username=${check.login}`, ip: clientIp(req) });
   return NextResponse.json({ ok: true });
@@ -58,7 +56,7 @@ export async function PUT(req: NextRequest) {
   const admin = await requireAdmin();
   const parsed = updateSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
-  const { id, name, username, token } = parsed.data;
+  const { id, name, token } = parsed.data;
   const [existing] = await db.select({ name: github_connections.name, username: github_connections.username })
     .from(github_connections).where(eq(github_connections.id, id)).limit(1);
   if (!existing) return NextResponse.json({ error: "Account not found" }, { status: 404 });
@@ -66,7 +64,7 @@ export async function PUT(req: NextRequest) {
   const changes = [`id=${id}`];
   if (name !== existing.name) changes.push(`name: ${existing.name}→${name}`);
   if (token) {
-    const check = await checkToken(token, username);
+    const check = await checkToken(token);
     if ("error" in check) return NextResponse.json({ error: check.error }, { status: 400 });
     await db.update(github_connections).set({ name, username: check.login, token: encrypt(token) }).where(eq(github_connections.id, id));
     changes.push("token replaced");

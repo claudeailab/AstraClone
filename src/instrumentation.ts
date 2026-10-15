@@ -111,7 +111,6 @@ export async function register() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
       `CREATE TABLE IF NOT EXISTS \`astraclone_syncs\` (
         \`id\` int NOT NULL AUTO_INCREMENT,
-        \`name\` varchar(255) NOT NULL,
         \`source_repo_id\` int NOT NULL,
         \`dest_repo_id\` int NOT NULL,
         \`direction\` varchar(20) NOT NULL DEFAULT 'one_way',
@@ -155,6 +154,8 @@ export async function register() {
       "ALTER TABLE `astraclone_users` ADD COLUMN `disabled` boolean NOT NULL DEFAULT false",
       "ALTER TABLE `astraclone_push_subscriptions` ADD COLUMN `label` varchar(255)",
       "ALTER TABLE `astraclone_push_subscriptions` ADD COLUMN `enabled` boolean NOT NULL DEFAULT true",
+      "ALTER TABLE `astraclone_syncs` DROP COLUMN `name`",
+      `UPDATE \`astraclone_permission_groups\` SET \`permissions\` = IF(\`permissions\` LIKE '%"administrator"%', '["administrator"]', '["user"]') WHERE \`permissions\` NOT IN ('["administrator"]', '["user"]')`,
     ];
     for (const sql of migrations) {
       try {

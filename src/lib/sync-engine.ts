@@ -1,7 +1,7 @@
 import os from "node:os";
 import path from "node:path";
 import { rm } from "node:fs/promises";
-import { and, desc, eq, lt } from "drizzle-orm";
+import { and, desc, eq, inArray, lt } from "drizzle-orm";
 import { db } from "./db";
 import { github_connections, repositories, sync_runs, syncs } from "./db/schema";
 import { decrypt } from "./encryption";
@@ -112,9 +112,16 @@ export async function removeSyncWorkdirs(ids: number[]) {
 
 const RECENT_RUNS = 10;
 
+export async function describeRoute(sourceRepoId: number, destRepoId: number, direction: string) {
+  const rows = await db.select({ id: repositories.id, owner: repositories.owner, name: repositories.name })
+    .from(repositories).where(inArray(repositories.id, [sourceRepoId, destRepoId]));
+  const label = (id: number) => { const r = rows.find(x => x.id === id); return r ? `${r.owner}/${r.name}` : `#${id}`; };
+  return `${label(sourceRepoId)} ${direction === "two_way" ? "↔" : "→"} ${label(destRepoId)}`;
+}
+
 export async function listSyncOverview(): Promise<SyncOverview[]> {
   const [rows, repos] = await Promise.all([
-    db.select().from(syncs).orderBy(syncs.name),
+    db.select().from(syncs).orderBy(syncs.id),
     db.select({ id: repositories.id, owner: repositories.owner, name: repositories.name }).from(repositories),
   ]);
   const repoName = new Map(repos.map(r => [r.id, `${r.owner}/${r.name}`]));
@@ -126,7 +133,6 @@ export async function listSyncOverview(): Promise<SyncOverview[]> {
   ));
   return rows.map((s, i) => ({
     id: s.id,
-    name: s.name,
     sourceRepoId: s.sourceRepoId,
     destRepoId: s.destRepoId,
     source: repoName.get(s.sourceRepoId) ?? "(deleted)",

@@ -4,6 +4,7 @@ import { db } from "./db";
 import { sessions, users, permission_groups } from "./db/schema";
 import { eq } from "drizzle-orm";
 import crypto from "crypto";
+import { roleFromPermissions } from "./permissions";
 
 export async function getSession() {
   const cookieStore = await cookies();
@@ -39,13 +40,19 @@ export async function getUser() {
     .limit(1);
 
   if (!row) return null;
-  const perms = JSON.parse(row.permissions ?? "[]") as string[];
-  return { id: row.id, email: row.username ?? row.email, displayName: row.displayName, groupId: row.groupId, isAdmin: perms.includes("administrator") };
+  const role = roleFromPermissions(row.permissions);
+  return { id: row.id, email: row.username ?? row.email, displayName: row.displayName, groupId: row.groupId, role, isAdmin: role === "administrator" };
 }
 
 export async function requireSession() {
   const user = await getUser();
   if (!user) redirect("/login");
+  return user;
+}
+
+export async function requireUserArea() {
+  const user = await getUser();
+  if (!user || !user.role) redirect("/login");
   return user;
 }
 
