@@ -121,8 +121,8 @@ Always prefer `mcp__github__*` tools over curl for GitHub API calls — the MCP 
 
 ## Sync form layout
 
-- The create/edit sync dialog is two columns from `md` up (`md:max-w-3xl`, no dialog scroll: `md:max-h-none md:overflow-visible`): left = source, destination (account above repository), direction, branches; right = what to sync, interval, switches. The branch checklist keeps its own `max-h-40` scroll. Below `md` it is one column and the dialog scrolls.
-- The UI calls `forcePush` "Overwrite destination changes"; keep that wording everywhere user-facing.
+- One column (`sm:max-w-2xl`, no dialog scroll from `sm` up; mobile scrolls). Section "Setup": label rows on one grid (`rowGrid`: `6rem` label column + control) — Source and Destination (account `2fr` + repository `3fr` selects), Direction (two-option `Segmented` toggle), Frequency (select), Branches (`BranchPicker`: dropdown with checkbox items, "All branches" first). Section "Options": one bordered list of `OptionRow`s (title + one-line description + switch): Tags, Mirror deletions, Overwrite destination (one-way only). Footer: Enabled switch left, Cancel/Save right. No helper paragraphs under controls; all controls `h-10`.
+- User-facing names: "Mirror deletions" / "Overwrite destination" (row facts say "Mirrors deletions" / "Overwrites destination"). The dialog does not auto-focus its first control.
 
 ## Verification
 

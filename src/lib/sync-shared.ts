@@ -1,10 +1,6 @@
 // Browser-safe — no server imports. Shared by admin and user sync views.
 
-export const SYNC_DIRECTIONS = [
-  { value: "one_way", label: "One-way (source → destination)" },
-  { value: "two_way", label: "Two-way (fast-forward both ways)" },
-] as const;
-export type SyncDirection = typeof SYNC_DIRECTIONS[number]["value"];
+export type SyncDirection = "one_way" | "two_way";
 
 export const SYNC_INTERVALS = [5, 15, 30, 60, 180, 360, 720, 1440];
 
