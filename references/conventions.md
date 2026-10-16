@@ -134,4 +134,10 @@ Always prefer `mcp__github__*` tools over curl for GitHub API calls — the MCP 
 
 - A sync row shows ONE status (`SyncHealth`): sync status + verification collapsed into the single most relevant label with a small dot — "Exact replica" / "Files identical" (green dot, neutral text), "Not identical" / "Conflict" (amber), "Failed" / "Verification failed" (red), "Syncing" / "Verifying" (spinner, primary), "Not run yet" / "In sync · not verified" (muted). Colour is reserved for states needing attention; healthy rows stay neutral.
 - Configuration facts (`SyncFacts`, including "Overwrites destination") are always neutral muted text — settings are not warnings.
-- Row actions are ghost icon buttons; Run uses the primary text colour, Delete is muted and turns red only on hover. Same on the accounts list. Filled badges (`SyncStatusBadge`, `VerificationBadge`) are used only inside detail views (history, verification panel).
+- Row actions are ghost icon buttons; Run uses the primary text colour, Delete is muted and turns red only on hover. Same on the accounts list. There are no filled status chips anywhere in the sync UI: detail views use the same dot + label style (`VerificationBadge`, run history dots).
+
+## Scrollbars and detail dialogs
+
+- Global thin, theme-matched scrollbars in `globals.css` (`scrollbar-width: thin`, translucent muted thumb, transparent track; WebKit fallback in rem). Never rely on default browser scrollbars.
+- Long dialogs never scroll as a whole: `DialogContent` is `flex max-h-[85dvh] flex-col overflow-hidden` and only the long region scrolls (`min-h-0 flex-1 overflow-y-auto`). Sync details (admin History and user Details) share `SyncDetails`: route + facts + verification fixed on top, "Runs" list scrolls. Dialogs opened from row actions use `onOpenAutoFocus={e => e.preventDefault()}`.
+- Run history entries: line 1 = status dot + message · date (right); line 2 = trigger · duration · verification label (coloured only when not identical) · files changed; ref/file details below.

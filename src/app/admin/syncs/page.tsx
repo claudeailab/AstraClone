@@ -13,7 +13,7 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Loader2, Plus, Pencil, Trash2, Play, History, Check, ShieldCheck, ChevronDown, ArrowRight, ArrowLeftRight } from "lucide-react";
 import { pageWrapper, pageInner, pageTitle, muted } from "@/lib/ui-conventions";
 import { SYNC_INTERVALS, intervalLabel, routeLabel, type SyncDirection, type SyncOverview } from "@/lib/sync-shared";
-import { RunHistoryList, SyncRoute, SyncRow, VerificationPanel, type RunDetail } from "@/components/sync/SyncDisplay";
+import { SyncDetails, SyncRow, type RunDetail } from "@/components/sync/SyncDisplay";
 
 interface Account { id: number; name: string; username: string }
 interface AccountRepo { fullName: string; isPrivate: boolean; canPush: boolean }
@@ -409,11 +409,9 @@ export default function SyncsPage() {
         </Dialog>
 
         <Dialog open={history !== null} onOpenChange={() => setHistory(null)}>
-          <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
-            <DialogHeader><DialogTitle>History</DialogTitle></DialogHeader>
-            {history && <SyncRoute sync={history.sync} />}
-            {history && <VerificationPanel verification={syncs.find(x => x.id === history.sync.id)?.verification ?? history.sync.verification} verifying={syncs.find(x => x.id === history.sync.id)?.verifying} />}
-            {history?.runs ? <RunHistoryList runs={history.runs} /> : <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin" /></div>}
+          <DialogContent className="flex max-h-[85dvh] max-w-2xl flex-col overflow-hidden" onOpenAutoFocus={e => e.preventDefault()}>
+            <DialogHeader><DialogTitle>Synchronization details</DialogTitle></DialogHeader>
+            {history && <SyncDetails sync={syncs.find(x => x.id === history.sync.id) ?? history.sync} runs={history.runs} />}
           </DialogContent>
         </Dialog>
 

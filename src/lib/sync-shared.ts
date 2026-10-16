@@ -12,12 +12,12 @@ export function intervalLabel(minutes: number) {
 
 export type SyncStatus = "pending" | "running" | "success" | "conflict" | "failed";
 
-export const SYNC_STATUS: Record<SyncStatus, { label: string; className: string; dot: string }> = {
-  pending:  { label: "Pending",   className: "border-transparent bg-secondary text-secondary-foreground", dot: "bg-muted-foreground/40" },
-  running:  { label: "Running",   className: "border-transparent bg-primary/15 text-primary", dot: "bg-primary" },
-  success:  { label: "In sync",   className: "border-transparent bg-emerald-500/15 text-emerald-700 dark:text-emerald-400", dot: "bg-emerald-500" },
-  conflict: { label: "Conflict",  className: "border-transparent bg-amber-500/15 text-amber-700 dark:text-amber-400", dot: "bg-amber-500" },
-  failed:   { label: "Failed",    className: "border-transparent bg-destructive/15 text-destructive", dot: "bg-destructive" },
+export const SYNC_STATUS: Record<SyncStatus, { label: string; dot: string }> = {
+  pending:  { label: "Pending",  dot: "bg-muted-foreground/40" },
+  running:  { label: "Running",  dot: "bg-primary" },
+  success:  { label: "In sync",  dot: "bg-emerald-500" },
+  conflict: { label: "Conflict", dot: "bg-amber-500" },
+  failed:   { label: "Failed",   dot: "bg-destructive" },
 };
 
 export function syncStatus(s: string) {
@@ -113,9 +113,9 @@ export interface Verification {
   error?: string;
 }
 
-export const VERIFY_STATUS: Record<Verification["status"], { label: string; className: string }> = {
-  identical: { label: "Exact replica", className: "border-transparent bg-emerald-500/15 text-emerald-700 dark:text-emerald-400" },
-  files_identical: { label: "Files identical", className: "border-transparent bg-primary/15 text-primary" },
-  different: { label: "Not identical", className: "border-transparent bg-amber-500/15 text-amber-700 dark:text-amber-400" },
-  error: { label: "Verification failed", className: "border-transparent bg-destructive/15 text-destructive" },
+export const VERIFY_STATUS: Record<Verification["status"], { label: string; dot: string; text: string }> = {
+  identical: { label: "Exact replica", dot: "bg-emerald-500", text: "text-foreground" },
+  files_identical: { label: "Files identical", dot: "bg-emerald-500", text: "text-foreground" },
+  different: { label: "Not identical", dot: "bg-amber-500", text: "text-amber-700 dark:text-amber-400" },
+  error: { label: "Verification failed", dot: "bg-destructive", text: "text-destructive" },
 };

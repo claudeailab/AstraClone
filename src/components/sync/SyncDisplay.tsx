@@ -1,19 +1,9 @@
 "use client";
 
-import { ArrowLeftRight, ArrowRight, ChevronRight, Clock, FileText, GitBranch, Loader2, PauseCircle, ShieldAlert, ShieldCheck, ShieldQuestion, Tag, Trash2, Zap } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { ArrowLeftRight, ArrowRight, ChevronRight, Clock, GitBranch, Loader2, PauseCircle, ShieldQuestion, Tag, Trash2, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FILE_STATUS, VERIFY_STATUS, intervalLabel, nextRunAt, relativeTime, syncStatus, type RefChange, type SyncOverview, type SyncProgress, type SyncRunSummary, type Verification } from "@/lib/sync-shared";
 
-export function SyncStatusBadge({ status }: { status: string }) {
-  const s = syncStatus(status);
-  return (
-    <Badge className={cn("gap-1 whitespace-nowrap", s.className)}>
-      {status === "running" && <Loader2 className="h-3 w-3 animate-spin" />}
-      {s.label}
-    </Badge>
-  );
-}
 
 export function SyncRoute({ sync }: { sync: Pick<SyncOverview, "source" | "destination" | "direction"> }) {
   const Icon = sync.direction === "two_way" ? ArrowLeftRight : ArrowRight;
@@ -92,26 +82,32 @@ function RefChangeItem({ c }: { c: RefChange }) {
   );
 }
 
+const shortDate = (iso: string) => new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+
 export function RunHistoryList({ runs }: { runs: RunDetail[] }) {
   if (!runs.length) return <p className="text-sm text-muted-foreground py-6 text-center">No runs yet.</p>;
   return (
     <ul className="divide-y divide-border">
       {runs.map(r => {
         const conflicts = (r.details ?? "").split("\n").filter(l => l.includes("CONFLICT"));
+        const v = r.verification ? VERIFY_STATUS[r.verification.status] : null;
         return (
-          <li key={r.id} className="py-3 flex flex-col gap-1.5">
-            <div className="flex flex-wrap items-center gap-2">
-              <SyncStatusBadge status={r.status} />
-              <span className="text-xs text-muted-foreground">
-                {new Date(r.startedAt).toLocaleString()} · {r.triggeredBy}{duration(r) ? ` · ${duration(r)}` : ""}
+          <li key={r.id} className="flex flex-col gap-1 py-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <span className="flex min-w-0 items-center gap-2">
+                <span className={cn("h-2 w-2 shrink-0 rounded-full", syncStatus(r.status).dot)} title={syncStatus(r.status).label} />
+                <span className="truncate text-sm" title={r.message ?? undefined}>{r.message ?? syncStatus(r.status).label}</span>
               </span>
-              {r.filesChanged > 0 && <span className="flex items-center gap-1 text-xs text-muted-foreground"><FileText className="h-3 w-3" />{r.filesChanged} file{r.filesChanged === 1 ? "" : "s"}</span>}
+              <span className="shrink-0 text-xs text-muted-foreground">{shortDate(r.startedAt)}</span>
             </div>
-            {r.message && <p className="text-sm break-words">{r.message}</p>}
-            {r.verification && <VerificationSummary verification={r.verification} />}
-            {r.changes.length > 0 && <ul className="flex flex-col">{r.changes.map((c, i) => <RefChangeItem key={i} c={c} />)}</ul>}
+            <p className="pl-4 text-xs text-muted-foreground">
+              {[r.triggeredBy, duration(r)].filter(Boolean).join(" · ")}
+              {v && <> · <span className={v.text === "text-foreground" ? "" : v.text}>{v.label}</span></>}
+              {r.filesChanged > 0 && <> · {r.filesChanged} file{r.filesChanged === 1 ? "" : "s"} changed</>}
+            </p>
+            {r.changes.length > 0 && <ul className="flex flex-col pl-4">{r.changes.map((c, i) => <RefChangeItem key={i} c={c} />)}</ul>}
             {conflicts.length > 0 && (
-              <ul className="flex flex-col gap-0.5">
+              <ul className="flex flex-col gap-0.5 pl-4">
                 {conflicts.map((l, i) => <li key={i} className="text-xs text-amber-700 dark:text-amber-400 break-words">{l}</li>)}
               </ul>
             )}
@@ -187,27 +183,17 @@ export function SyncRow({ sync, actions }: { sync: SyncOverview; actions: React.
   );
 }
 
-export function VerificationBadge({ verification, verifying }: { verification: Verification | null; verifying?: boolean }) {
-  if (verifying) return <Badge className="gap-1 border-transparent bg-primary/15 text-primary"><Loader2 className="h-3 w-3 animate-spin" />Verifying</Badge>;
-  if (!verification) return <Badge variant="outline" className="gap-1 text-muted-foreground"><ShieldQuestion className="h-3 w-3" />Not verified</Badge>;
+export function VerificationBadge({ verification }: { verification: Verification | null }) {
+  if (!verification) return <span className="inline-flex items-center gap-2 text-sm text-muted-foreground"><ShieldQuestion className="h-3.5 w-3.5" />Not verified</span>;
   const v = VERIFY_STATUS[verification.status];
-  const Icon = verification.status === "identical" || verification.status === "files_identical" ? ShieldCheck : ShieldAlert;
   return (
-    <Badge className={cn("gap-1 whitespace-nowrap", v.className)} title={`Checked ${relativeTime(verification.checkedAt)}`}>
-      <Icon className="h-3 w-3" />{v.label}
-    </Badge>
+    <span className="inline-flex items-center gap-2 text-sm" title={`Checked ${relativeTime(verification.checkedAt)}`}>
+      <span className={cn("h-2 w-2 rounded-full", v.dot)} />
+      <span className={cn("font-medium", v.text)}>{v.label}</span>
+    </span>
   );
 }
 
-function VerificationSummary({ verification }: { verification: Verification }) {
-  if (verification.status === "error") return <p className="text-xs text-destructive break-words">Verification failed: {verification.error}</p>;
-  return (
-    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-      <VerificationBadge verification={verification} />
-      <span>{verification.identicalBranches}/{verification.branches} branches identical{verification.tags ? ` · ${verification.identicalTags}/${verification.tags} tags identical` : ""}</span>
-    </p>
-  );
-}
 
 function describeDifference(d: Verification["differences"][number]) {
   if (!d.destination) return "Missing in destination";
@@ -288,5 +274,24 @@ export function SyncHealth({ sync }: { sync: Pick<SyncOverview, "lastStatus" | "
       <span className={cn("font-medium", t.text)}>{h.label}</span>
       {!sync.enabled && <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><PauseCircle className="h-3 w-3" />Paused</span>}
     </span>
+  );
+}
+
+/** Shared detail view (admin History and user Details): fixed summary on top, only the run list scrolls. */
+export function SyncDetails({ sync, runs }: { sync: SyncOverview; runs: RunDetail[] | null }) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
+      <div className="flex flex-col gap-2">
+        <SyncRoute sync={sync} />
+        <SyncFacts sync={sync} />
+      </div>
+      <VerificationPanel verification={sync.verification} verifying={sync.verifying} />
+      <div className="flex min-h-0 flex-1 flex-col gap-1">
+        <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Runs</h3>
+        <div className="-mr-3 min-h-0 flex-1 overflow-y-auto pr-3">
+          {runs ? <RunHistoryList runs={runs} /> : <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin" /></div>}
+        </div>
+      </div>
+    </div>
   );
 }
