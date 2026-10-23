@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeftRight, ArrowRight, ChevronRight, Clock, GitBranch, Loader2, PauseCircle, ShieldQuestion, Tag, Trash2, Zap } from "lucide-react";
+import { AlertTriangle, ArrowLeftRight, ArrowRight, ChevronRight, Clock, GitBranch, Loader2, ShieldAlert, ShieldCheck, ShieldQuestion, Tag, Trash2, XCircle, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FILE_STATUS, VERIFY_STATUS, intervalLabel, nextRunAt, relativeTime, syncStatus, type RefChange, type SyncOverview, type SyncProgress, type SyncRunSummary, type Verification } from "@/lib/sync-shared";
 
@@ -16,20 +16,6 @@ export function SyncRoute({ sync }: { sync: Pick<SyncOverview, "source" | "desti
   );
 }
 
-export function RunHistoryDots({ runs }: { runs: SyncRunSummary[] }) {
-  if (!runs.length) return null;
-  return (
-    <div className="flex items-center gap-1" aria-label="Recent runs">
-      {[...runs].reverse().map(r => (
-        <span
-          key={r.id}
-          title={`${syncStatus(r.status).label} · ${new Date(r.startedAt).toLocaleString()}${r.message ? ` · ${r.message}` : ""}`}
-          className={cn("h-2 w-2 rounded-full", syncStatus(r.status).dot)}
-        />
-      ))}
-    </div>
-  );
-}
 
 function duration(r: SyncRunSummary) {
   if (!r.finishedAt) return null;
@@ -150,38 +136,6 @@ export function SyncFacts({ sync }: { sync: Pick<SyncOverview, "direction" | "br
   );
 }
 
-/**
- * One synchronization as a compact row of three full-width lines — route · badges / facts / last result + timing · recent runs —
- * with actions in their own column.
- */
-export function SyncRow({ sync, actions }: { sync: SyncOverview; actions: React.ReactNode }) {
-  const line = "flex flex-wrap items-center justify-between gap-x-6 gap-y-1";
-  return (
-    <div className="flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:gap-6">
-      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-        <div className={line}>
-          <SyncRoute sync={sync} />
-          <SyncHealth sync={sync} />
-        </div>
-        <SyncFacts sync={sync} />
-        {sync.running || sync.verifying
-          ? <SyncProgressBar progress={sync.progress} />
-          : (
-            <div className={line}>
-              <p className="min-w-0 text-sm md:truncate" title={sync.lastMessage ?? undefined}>
-                {sync.lastMessage ?? "Not run yet"}
-                <span className="text-xs text-muted-foreground">
-                  {" · "}Last run {relativeTime(sync.lastRunAt)}{sync.enabled ? ` · next ${relativeTime(nextRunAt(sync))}` : ""}
-                </span>
-              </p>
-              <RunHistoryDots runs={sync.recentRuns} />
-            </div>
-          )}
-      </div>
-      <div className="flex shrink-0 items-center gap-1">{actions}</div>
-    </div>
-  );
-}
 
 export function VerificationBadge({ verification }: { verification: Verification | null }) {
   if (!verification) return <span className="inline-flex items-center gap-2 text-sm text-muted-foreground"><ShieldQuestion className="h-3.5 w-3.5" />Not verified</span>;
@@ -240,42 +194,6 @@ export function VerificationPanel({ verification, verifying }: { verification: V
   );
 }
 
-type Tone = "ok" | "info" | "warn" | "error" | "muted";
-
-const TONE: Record<Tone, { dot: string; text: string }> = {
-  ok: { dot: "bg-emerald-500", text: "text-foreground" },
-  info: { dot: "bg-primary", text: "text-primary" },
-  warn: { dot: "bg-amber-500", text: "text-amber-700 dark:text-amber-400" },
-  error: { dot: "bg-destructive", text: "text-destructive" },
-  muted: { dot: "bg-muted-foreground/40", text: "text-muted-foreground" },
-};
-
-/** Collapses sync status + verification into the one thing worth knowing; colour only when attention is needed. */
-function healthOf(sync: Pick<SyncOverview, "lastStatus" | "running" | "verifying" | "verification">): { tone: Tone; label: string; busy?: boolean } {
-  if (sync.running) return { tone: "info", label: "Syncing", busy: true };
-  if (sync.verifying) return { tone: "info", label: "Verifying", busy: true };
-  if (sync.lastStatus === "failed") return { tone: "error", label: "Failed" };
-  if (sync.lastStatus === "conflict") return { tone: "warn", label: "Conflict" };
-  if (sync.lastStatus === "pending") return { tone: "muted", label: "Not run yet" };
-  const v = sync.verification?.status;
-  if (v === "identical") return { tone: "ok", label: "Exact replica" };
-  if (v === "files_identical") return { tone: "ok", label: "Files identical" };
-  if (v === "different") return { tone: "warn", label: "Not identical" };
-  if (v === "error") return { tone: "error", label: "Verification failed" };
-  return { tone: "muted", label: "In sync · not verified" };
-}
-
-export function SyncHealth({ sync }: { sync: Pick<SyncOverview, "lastStatus" | "running" | "verifying" | "verification" | "enabled"> }) {
-  const h = healthOf(sync);
-  const t = TONE[h.tone];
-  return (
-    <span className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap text-sm" title={sync.verification ? `Verified ${relativeTime(sync.verification.checkedAt)}` : undefined}>
-      {h.busy ? <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" /> : <span className={cn("h-2 w-2 rounded-full", t.dot)} />}
-      <span className={cn("font-medium", t.text)}>{h.label}</span>
-      {!sync.enabled && <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><PauseCircle className="h-3 w-3" />Paused</span>}
-    </span>
-  );
-}
 
 /** Shared detail view (admin History and user Details): fixed summary on top, only the run list scrolls. */
 export function SyncDetails({ sync, runs }: { sync: SyncOverview; runs: RunDetail[] | null }) {
@@ -292,6 +210,95 @@ export function SyncDetails({ sync, runs }: { sync: SyncOverview; runs: RunDetai
           {runs ? <RunHistoryList runs={runs} /> : <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin" /></div>}
         </div>
       </div>
+    </div>
+  );
+}
+
+export type Tone = "ok" | "info" | "warn" | "error" | "muted";
+
+const TONE: Record<Tone, { tile: string; text: string }> = {
+  ok: { tile: "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400", text: "text-emerald-700 dark:text-emerald-400" },
+  info: { tile: "bg-primary/12 text-primary", text: "text-primary" },
+  warn: { tile: "bg-amber-500/15 text-amber-600 dark:text-amber-400", text: "text-amber-700 dark:text-amber-400" },
+  error: { tile: "bg-destructive/12 text-destructive", text: "text-destructive" },
+  muted: { tile: "bg-secondary text-muted-foreground", text: "text-muted-foreground" },
+};
+
+/** Sync status + verification collapsed into the one thing worth knowing. */
+function healthOf(sync: Pick<SyncOverview, "lastStatus" | "running" | "verifying" | "verification" | "enabled">): { tone: Tone; label: string; icon: React.ElementType; spin?: boolean } {
+  if (sync.running) return { tone: "info", label: "Syncing", icon: Loader2, spin: true };
+  if (sync.verifying) return { tone: "info", label: "Verifying", icon: Loader2, spin: true };
+  if (sync.lastStatus === "failed") return { tone: "error", label: "Failed", icon: XCircle };
+  if (sync.lastStatus === "conflict") return { tone: "warn", label: "Conflict", icon: AlertTriangle };
+  if (sync.lastStatus === "pending") return { tone: "muted", label: "Not run yet", icon: Clock };
+  const v = sync.verification?.status;
+  if (v === "identical") return { tone: "ok", label: "Exact replica", icon: ShieldCheck };
+  if (v === "files_identical") return { tone: "ok", label: "Files identical", icon: ShieldCheck };
+  if (v === "different") return { tone: "warn", label: "Not identical", icon: ShieldAlert };
+  if (v === "error") return { tone: "error", label: "Verification failed", icon: ShieldAlert };
+  return { tone: "muted", label: "Not verified", icon: ShieldQuestion };
+}
+
+const split = (full: string) => { const i = full.indexOf("/"); return i < 0 ? { owner: "", name: full } : { owner: full.slice(0, i), name: full.slice(i + 1) }; };
+
+export function shortInterval(minutes: number) {
+  if (minutes === 60) return "Hourly";
+  if (minutes === 1440) return "Daily";
+  if (minutes % 1440 === 0) return `Every ${minutes / 1440} days`;
+  if (minutes % 60 === 0) return `Every ${minutes / 60} h`;
+  return `Every ${minutes} min`;
+}
+
+/**
+ * One synchronization: tinted status tile · repository name + "owner → owner · schedule" · status + last result · actions.
+ * The row content opens the details view; actions sit beside it, so clicking them never opens details.
+ */
+export function SyncRow({ sync, onOpen, actions }: { sync: SyncOverview; onOpen: () => void; actions: React.ReactNode }) {
+  const h = healthOf(sync);
+  const t = TONE[h.tone];
+  const src = split(sync.source), dst = split(sync.destination);
+  const title = src.name.toLowerCase() === dst.name.toLowerCase() ? src.name : `${src.name} → ${dst.name}`;
+  const arrow = sync.direction === "two_way" ? "⇄" : "→";
+  const subtitle = [`${src.owner} ${arrow} ${dst.owner}`, shortInterval(sync.intervalMinutes), sync.branches || null].filter(Boolean).join(" · ");
+  const busy = sync.running || sync.verifying;
+  return (
+    <div className="flex items-center gap-2 pr-3 transition-colors hover:bg-secondary/50 has-[:focus-visible]:bg-secondary/50">
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onOpen}
+        onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(); } }}
+        className="flex min-w-0 flex-1 cursor-pointer items-center gap-4 py-3.5 pl-4 focus-visible:outline-none"
+      >
+      <StatusTile tone={h.tone} icon={h.icon} spin={h.spin} />
+      <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="truncate font-semibold" title={`${sync.source} ${arrow} ${sync.destination}`}>{title}</span>
+            {!sync.enabled && <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground">Paused</span>}
+          </span>
+          <span className="text-sm text-muted-foreground sm:truncate">{subtitle}</span>
+        </div>
+        <div className="flex min-w-0 flex-col gap-0.5 sm:w-56 sm:items-end sm:text-right">
+          <span className={cn("text-sm font-medium", t.text)}>{h.label}</span>
+          {busy
+            ? <div className="w-full"><SyncProgressBar progress={sync.progress} /></div>
+            : <span className="truncate text-xs text-muted-foreground" title={sync.lastMessage ?? undefined}>
+                {sync.lastRunAt ? `${sync.lastMessage ?? ""} · ${relativeTime(sync.lastRunAt)}` : sync.enabled ? `Runs ${relativeTime(nextRunAt(sync))}` : "Paused"}
+              </span>}
+        </div>
+      </div>
+      </div>
+      <div className="flex shrink-0 items-center gap-0.5">{actions}</div>
+    </div>
+  );
+}
+
+/** Tinted rounded icon square — the one place colour lives in sync lists and summaries. */
+export function StatusTile({ tone, icon: Icon, spin }: { tone: Tone; icon: React.ElementType; spin?: boolean }) {
+  return (
+    <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", TONE[tone].tile)}>
+      <Icon className={cn("h-5 w-5", spin && "animate-spin")} />
     </div>
   );
 }

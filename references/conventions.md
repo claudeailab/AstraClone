@@ -117,7 +117,7 @@ Always prefer `mcp__github__*` tools over curl for GitHub API calls — the MCP 
 
 ## List layouts
 
-- Accounts and synchronizations are compact horizontal rows inside one `Card` (`divide-y`), not card grids. Sync rows use the shared `SyncRow`: three full-width lines — route (left) · status + verification badges (right) / facts (`SyncFacts`, one line of icon+text items) / last result + timing (left) · recent-run dots (right) — with actions in their own column (admin: equal-size icon buttons Run/Verify/History/Edit/Delete; user: Details). From `md` up each line stays single-line (route and result truncate); below `md` they wrap instead of truncating. The admin `<main>` has `min-w-0` so long nowrap text can never widen the page on mobile.
+- Accounts and synchronizations are compact horizontal rows inside one `Card` (`divide-y`), not card grids. Sync rows use the shared `SyncRow`: tinted `StatusTile` (icon conveys state) · bold repository name ("src → dst" names only when they differ) over a muted subtitle `srcOwner → dstOwner · schedule · branches` · status label (tone-coloured) over `last result · time` (or a progress bar while running) · actions. The row content is the click target that opens details; actions sit beside it (never inside) so they can't trigger it. Admin actions: Run icon + ⋯ menu (Details, Verify now, Edit, Delete); user area: chevron. Full settings (`SyncFacts`) appear only in the details view.
 
 ## Sync form layout
 
@@ -132,7 +132,7 @@ Always prefer `mcp__github__*` tools over curl for GitHub API calls — the MCP 
 
 ## Status colour discipline
 
-- A sync row shows ONE status (`SyncHealth`): sync status + verification collapsed into the single most relevant label with a small dot — "Exact replica" / "Files identical" (green dot, neutral text), "Not identical" / "Conflict" (amber), "Failed" / "Verification failed" (red), "Syncing" / "Verifying" (spinner, primary), "Not run yet" / "In sync · not verified" (muted). Colour is reserved for states needing attention; healthy rows stay neutral.
+- A sync row shows ONE status (`healthOf` → `StatusTile` + label): sync status + verification collapsed into the single most relevant label with a small dot — "Exact replica" / "Files identical" (green dot, neutral text), "Not identical" / "Conflict" (amber), "Failed" / "Verification failed" (red), "Syncing" / "Verifying" (spinner, primary), "Not run yet" / "In sync · not verified" (muted). Colour is reserved for states needing attention; healthy rows stay neutral.
 - Configuration facts (`SyncFacts`, including "Overwrites destination") are always neutral muted text — settings are not warnings.
 - Row actions are ghost icon buttons; Run uses the primary text colour, Delete is muted and turns red only on hover. Same on the accounts list. There are no filled status chips anywhere in the sync UI: detail views use the same dot + label style (`VerificationBadge`, run history dots).
 
@@ -141,3 +141,7 @@ Always prefer `mcp__github__*` tools over curl for GitHub API calls — the MCP 
 - Global thin, theme-matched scrollbars in `globals.css` (`scrollbar-width: thin`, translucent muted thumb, transparent track; WebKit fallback in rem). Never rely on default browser scrollbars.
 - Long dialogs never scroll as a whole: `DialogContent` is `flex max-h-[85dvh] flex-col overflow-hidden` and only the long region scrolls (`min-h-0 flex-1 overflow-y-auto`). Sync details (admin History and user Details) share `SyncDetails`: route + facts + verification fixed on top, "Runs" list scrolls. Dialogs opened from row actions use `onOpenAutoFocus={e => e.preventDefault()}`.
 - Run history entries: line 1 = status dot + message · date (right); line 2 = trigger · duration · verification label (coloured only when not identical) · files changed; ref/file details below.
+
+## Status tiles
+
+- `StatusTile` (tinted rounded square + icon) is the single carrier of colour in sync lists and the user-area summary tiles: ok = emerald/ShieldCheck, warn = amber/AlertTriangle or ShieldAlert, error = destructive/XCircle, info = primary/spinner, muted = secondary/Clock. Summary tiles with a zero count use the muted tone.
