@@ -12,13 +12,22 @@ import type { SyncOverview, SyncProgress, Verification } from "./sync-shared";
 const WORK_ROOT = path.join(os.tmpdir(), "astraclone-sync");
 const KEEP_RUNS = 50;
 const TICK_MS = 60_000;
-const active = new Map<number, "sync" | "verify">();
-const progress = new Map<number, SyncProgress>();
-let ticking = false;
+interface EngineState {
+  active: Map<number, "sync" | "verify">;
+  progress: Map<number, SyncProgress>;
+  runTrigger: Map<number, "schedule" | "manual">;
+  ticking: boolean;
+  timer?: NodeJS.Timeout;
+}
 
 declare global {
-  var __astracloneSyncTimer: NodeJS.Timeout | undefined;
+  var __astracloneSyncEngine: EngineState | undefined;
 }
+
+// Next.js loads this module separately for instrumentation (the scheduler) and for route handlers.
+// Run state must be process-wide so pages see scheduled runs and the run lock covers both.
+const engine: EngineState = (globalThis.__astracloneSyncEngine ??= { active: new Map(), progress: new Map(), runTrigger: new Map(), ticking: false });
+const { active, progress, runTrigger } = engine;
 
 function workdir(syncId: number) {
   return path.join(WORK_ROOT, String(syncId));
@@ -88,6 +97,7 @@ export async function verifySync(id: number): Promise<boolean> {
 export async function runSync(id: number, triggeredBy: "schedule" | "manual"): Promise<boolean> {
   if (active.has(id)) return false;
   active.set(id, "sync");
+  runTrigger.set(id, triggeredBy);
   const startedAt = new Date();
   let runId: number | null = null;
   let result: SyncResult;
@@ -142,13 +152,14 @@ export async function runSync(id: number, triggeredBy: "schedule" | "manual"): P
   } finally {
     active.delete(id);
     progress.delete(id);
+    runTrigger.delete(id);
   }
   return true;
 }
 
 async function tick() {
-  if (ticking) return;
-  ticking = true;
+  if (engine.ticking) return;
+  engine.ticking = true;
   try {
     const rows = await db.select({ id: syncs.id, intervalMinutes: syncs.intervalMinutes, lastRunAt: syncs.lastRunAt })
       .from(syncs).where(eq(syncs.enabled, true));
@@ -159,24 +170,22 @@ async function tick() {
   } catch (err) {
     console.error("[Sync] Scheduler error:", err);
   } finally {
-    ticking = false;
+    engine.ticking = false;
   }
 }
 
 export async function startSyncScheduler() {
-  if (globalThis.__astracloneSyncTimer) return;
+  if (engine.timer) return;
   const interrupted = { status: "failed", message: "Interrupted by restart" };
   await db.update(syncs).set({ lastStatus: interrupted.status, lastMessage: interrupted.message }).where(eq(syncs.lastStatus, "running"));
   await db.update(sync_runs).set({ ...interrupted, finishedAt: new Date() }).where(eq(sync_runs.status, "running"));
-  globalThis.__astracloneSyncTimer = setInterval(tick, TICK_MS);
+  engine.timer = setInterval(tick, TICK_MS);
   setTimeout(tick, 15_000);
 }
 
 export async function removeSyncWorkdirs(ids: number[]) {
   await Promise.all(ids.map(id => rm(workdir(id), { recursive: true, force: true })));
 }
-
-const RECENT_RUNS = 10;
 
 export async function describeRoute(sourceRepoId: number, destRepoId: number, direction: string) {
   const rows = await db.select({ id: repositories.id, owner: repositories.owner, name: repositories.name })
@@ -192,13 +201,7 @@ export async function listSyncOverview(): Promise<SyncOverview[]> {
   ]);
   const repoName = new Map(repos.map(r => [r.id, `${r.owner}/${r.name}`]));
   const repoConn = new Map(repos.map(r => [r.id, r.connectionId]));
-  const runs = await Promise.all(rows.map(s =>
-    db.select({
-      id: sync_runs.id, status: sync_runs.status, triggeredBy: sync_runs.triggeredBy,
-      message: sync_runs.message, filesChanged: sync_runs.filesChanged, startedAt: sync_runs.startedAt, finishedAt: sync_runs.finishedAt,
-    }).from(sync_runs).where(eq(sync_runs.syncId, s.id)).orderBy(desc(sync_runs.id)).limit(RECENT_RUNS)
-  ));
-  return rows.map((s, i) => ({
+  const list: SyncOverview[] = rows.map(s => ({
     id: s.id,
     sourceConnectionId: repoConn.get(s.sourceRepoId) ?? 0,
     destConnectionId: repoConn.get(s.destRepoId) ?? 0,
@@ -215,11 +218,15 @@ export async function listSyncOverview(): Promise<SyncOverview[]> {
     lastMessage: s.lastMessage,
     lastRunAt: s.lastRunAt?.toISOString() ?? null,
     running: active.get(s.id) === "sync",
+    trigger: active.get(s.id) === "sync" ? runTrigger.get(s.id) ?? null : null,
     verifying: active.get(s.id) === "verify",
     progress: progress.get(s.id) ?? null,
     verification: parseVerification(s.verification),
-    recentRuns: runs[i].map(r => ({ ...r, startedAt: r.startedAt.toISOString(), finishedAt: r.finishedAt?.toISOString() ?? null })),
   }));
+  // Alphabetical by repository name (source, then destination), the same order everywhere.
+  const key = (full: string) => full.slice(full.indexOf("/") + 1);
+  const cmp = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: "base", numeric: true });
+  return list.sort((a, b) => cmp(key(a.source), key(b.source)) || cmp(key(a.destination), key(b.destination)) || cmp(a.source, b.source));
 }
 
 /** Verifies access with the account's token and returns the internal repository record, creating or refreshing it. */

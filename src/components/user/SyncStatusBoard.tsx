@@ -5,7 +5,7 @@ import { AlertTriangle, ChevronRight, Loader2, RefreshCw, ShieldCheck, XCircle }
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { muted, sectionTitle } from "@/lib/ui-conventions";
-import type { SyncOverview, SyncStatus } from "@/lib/sync-shared";
+import { pollInterval, type SyncOverview, type SyncStatus } from "@/lib/sync-shared";
 import { StatusTile, SyncDetails, SyncRow, type RunDetail, type Tone } from "@/components/sync/SyncDisplay";
 
 const SUMMARY: { key: SyncStatus; label: string; tone: Tone; icon: React.ElementType }[] = [
@@ -26,7 +26,7 @@ export default function SyncStatusBoard() {
     setSelected({ sync, runs: d.runs ?? [] });
   }
 
-  const anyRunning = syncs?.some(s => s.running || s.verifying) ?? false;
+  const refreshMs = pollInterval(syncs ?? []);
   useEffect(() => {
     let live = true;
     const poll = () => fetch("/api/syncs")
@@ -34,9 +34,9 @@ export default function SyncStatusBoard() {
       .then(d => { if (live && d) setSyncs(d.syncs ?? []); })
       .catch(() => {});
     poll();
-    const t = setInterval(poll, anyRunning ? 3_000 : 15_000);
+    const t = setInterval(poll, refreshMs);
     return () => { live = false; clearInterval(t); };
-  }, [anyRunning]);
+  }, [refreshMs]);
 
   if (!syncs) return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin" /></div>;
   if (!syncs.length) return <p className={`text-center py-12 ${muted}`}>No synchronizations have been configured yet.</p>;

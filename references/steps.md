@@ -38,6 +38,10 @@ Start `dockerd` (sudo), run `mysql:8.4` via Docker, `npm run build`, then `npx n
 
 In CCR the proxy only allows repository-scoped GitHub endpoints, so `/user/repos` (account repository list) returns 403 there — it works with a real PAT in production. To browser-test the repository picker, stub `/api/admin/accounts/repos` with Playwright `page.route`, and create the context with `serviceWorkers: "block"` — the app's PWA service worker otherwise handles fetches and bypasses `page.route`.
 
+## Scheduler activity not visible in the UI
+
+Symptom: scheduled runs happened (run rows appeared) but the pages never showed them as running. Cause: Next.js instantiates `sync-engine.ts` once for `instrumentation.ts` and again for route handlers, so module-level `Map`s were separate copies. Fix: keep all in-process engine state on a `globalThis` singleton (`__astracloneSyncEngine`). Apply the same pattern to any state shared between the scheduler and API routes. Verify end-to-end: let the real scheduler start a run and poll `/api/admin/syncs` until `running: true, trigger: "schedule"` appears.
+
 ## Bumping the Version
 
 Update all three files atomically:

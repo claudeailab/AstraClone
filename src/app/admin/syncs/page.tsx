@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Loader2, Plus, Pencil, Trash2, Play, History, Check, ShieldCheck, ChevronDown, ArrowRight, ArrowLeftRight, MoreHorizontal } from "lucide-react";
 import { pageWrapper, pageInner, pageTitle, muted } from "@/lib/ui-conventions";
-import { SYNC_INTERVALS, intervalLabel, routeLabel, type SyncDirection, type SyncOverview } from "@/lib/sync-shared";
+import { SYNC_INTERVALS, intervalLabel, pollInterval, routeLabel, type SyncDirection, type SyncOverview } from "@/lib/sync-shared";
 import { SyncDetails, SyncRow, type RunDetail } from "@/components/sync/SyncDisplay";
 
 interface Account { id: number; name: string; username: string }
@@ -162,11 +162,11 @@ export default function SyncsPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const anyRunning = syncs.some(s => s.running || s.verifying);
+  const refreshMs = pollInterval(syncs);
   useEffect(() => {
-    const t = setInterval(load, anyRunning ? 3_000 : 30_000);
+    const t = setInterval(load, refreshMs);
     return () => clearInterval(t);
-  }, [load, anyRunning]);
+  }, [load, refreshMs]);
 
   async function loadRepos(connectionId: string) {
     if (!connectionId || Array.isArray(repoLists[connectionId])) return;

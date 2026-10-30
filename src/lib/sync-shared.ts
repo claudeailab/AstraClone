@@ -54,10 +54,11 @@ export interface SyncOverview {
   lastMessage: string | null;
   lastRunAt: string | null;
   running: boolean;
+  /** What started the current run (only while `running`). */
+  trigger: "schedule" | "manual" | null;
   progress: SyncProgress | null;
   verifying: boolean;
   verification: Verification | null;
-  recentRuns: SyncRunSummary[];
 }
 
 export function routeLabel(s: Pick<SyncOverview, "source" | "destination" | "direction">) {
@@ -119,3 +120,19 @@ export const VERIFY_STATUS: Record<Verification["status"], { label: string; dot:
   different: { label: "Not identical", dot: "bg-amber-500", text: "text-amber-700 dark:text-amber-400" },
   error: { label: "Verification failed", dot: "bg-destructive", text: "text-destructive" },
 };
+
+/**
+ * How often sync lists refresh: fast while something runs or a scheduled run is due within a minute
+ * (the scheduler checks every minute, so short scheduled runs would otherwise start and finish unseen).
+ */
+export function pollInterval(list: Pick<SyncOverview, "running" | "verifying" | "enabled" | "lastRunAt" | "intervalMinutes">[]): number {
+  if (list.some(s => s.running || s.verifying)) return 2_000;
+  const now = Date.now();
+  const dueSoon = list.some(s => {
+    const next = nextRunAt(s);
+    if (!next) return false;
+    const inMs = new Date(next).getTime() - now;
+    return inMs < 60_000 && inMs > -5 * 60_000;
+  });
+  return dueSoon ? 2_000 : 15_000;
+}

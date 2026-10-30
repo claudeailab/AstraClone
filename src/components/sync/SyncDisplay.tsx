@@ -225,8 +225,8 @@ const TONE: Record<Tone, { tile: string; text: string }> = {
 };
 
 /** Sync status + verification collapsed into the one thing worth knowing. */
-function healthOf(sync: Pick<SyncOverview, "lastStatus" | "running" | "verifying" | "verification" | "enabled">): { tone: Tone; label: string; icon: React.ElementType; spin?: boolean } {
-  if (sync.running) return { tone: "info", label: "Syncing", icon: Loader2, spin: true };
+function healthOf(sync: Pick<SyncOverview, "lastStatus" | "running" | "trigger" | "verifying" | "verification" | "enabled">): { tone: Tone; label: string; icon: React.ElementType; spin?: boolean } {
+  if (sync.running) return { tone: "info", label: sync.trigger === "schedule" ? "Scheduled sync" : "Syncing", icon: Loader2, spin: true };
   if (sync.verifying) return { tone: "info", label: "Verifying", icon: Loader2, spin: true };
   if (sync.lastStatus === "failed") return { tone: "error", label: "Failed", icon: XCircle };
   if (sync.lastStatus === "conflict") return { tone: "warn", label: "Conflict", icon: AlertTriangle };

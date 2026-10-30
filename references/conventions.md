@@ -107,7 +107,10 @@ Always prefer `mcp__github__*` tools over curl for GitHub API calls — the MCP 
 
 - `syncs.ref_state` (JSON `{src, dst}` of `heads/<b>`/`tags/<t>` → sha after the last run) drives `propagateDeletes` (a ref in the previous state but gone now is deleted on the other side only if that side still equals the previous source sha; `forcePush` overrides in one-way). Conflicted refs keep their previous state so they are retried. State (and the stored verification) is reset (NULL) when source, destination, direction, branches or tags change. Every sync makes the destination match the source — there is no partial/"changes only" mode (removed: exact replicas are the product's guarantee).
 - `sync_runs.changes` (JSON `RefChange[]`, ≤1000 files per ref) + `files_changed`; new branches list files vs the merge-base with the other side's default branch. Served to admins and users via `/api/syncs/runs?id=`.
-- Progress: `syncRepositories(..., onProgress)` reports stage + percent (git `--progress` parsed from stderr via `spawn`); kept in memory in `sync-engine.ts` and returned as `SyncOverview.progress` while running; UI polls every 3s while anything runs.
+- Progress: `syncRepositories(..., onProgress)` reports stage + percent (git `--progress` parsed from stderr via `spawn`); kept in memory in `sync-engine.ts` and returned as `SyncOverview.progress` while running; UI polls via `pollInterval()` (sync-shared): 2s while anything runs/verifies or a sync is due within 60s, otherwise 15s.
+- Engine state (`active`, `progress`, `runTrigger`, ticking flag, timer) lives on `globalThis.__astracloneSyncEngine`, never in module-level variables: Next.js loads `sync-engine.ts` separately for `instrumentation.ts` (scheduler) and for route handlers, so module state would be invisible across them (and could double-run a sync).
+- `SyncOverview.trigger` (`schedule` | `manual` | null while not syncing): scheduler-started runs show "Scheduled sync", manual runs "Syncing".
+- `listSyncOverview()` returns syncs sorted alphabetically (case-insensitive, numeric-aware) by source repo name, then destination repo name, then full owner/name.
 
 ## Sessions
 
@@ -132,7 +135,7 @@ Always prefer `mcp__github__*` tools over curl for GitHub API calls — the MCP 
 
 ## Status colour discipline
 
-- A sync row shows ONE status (`healthOf` → `StatusTile` + label): sync status + verification collapsed into the single most relevant label with a small dot — "Exact replica" / "Files identical" (green dot, neutral text), "Not identical" / "Conflict" (amber), "Failed" / "Verification failed" (red), "Syncing" / "Verifying" (spinner, primary), "Not run yet" / "In sync · not verified" (muted). Colour is reserved for states needing attention; healthy rows stay neutral.
+- A sync row shows ONE status (`healthOf` → `StatusTile` + label): sync status + verification collapsed into the single most relevant label with a small dot — "Exact replica" / "Files identical" (green dot, neutral text), "Not identical" / "Conflict" (amber), "Failed" / "Verification failed" (red), "Scheduled sync" / "Syncing" / "Verifying" (spinner, primary), "Not run yet" / "In sync · not verified" (muted). Colour is reserved for states needing attention; healthy rows stay neutral.
 - Configuration facts (`SyncFacts`, including "Overwrites destination") are always neutral muted text — settings are not warnings.
 - Row actions are ghost icon buttons; Run uses the primary text colour, Delete is muted and turns red only on hover. Same on the accounts list. There are no filled status chips anywhere in the sync UI: detail views use the same dot + label style (`VerificationBadge`, run history dots).
 
